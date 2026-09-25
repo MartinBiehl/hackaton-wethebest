@@ -1,7 +1,16 @@
 # Dependencies and build output
 node_modules/
 dist/
+build/
 coverage/
+.vite/
+
+# Python backend (if selected)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
 
 # Local environment variables and secrets
 .env

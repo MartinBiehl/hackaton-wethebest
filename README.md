@@ -11,17 +11,38 @@ Estrutura inicial para desenvolver rapidamente uma aplicação com React, TypeSc
 ## Estrutura
 
 ```text
-.vscode/                   Recomendações e preferências do editor
-frontend/src/components/   Componentes de interface reutilizáveis
-frontend/src/pages/        Páginas/telas
-frontend/src/hooks/        Hooks React
-frontend/src/types/        Tipos compartilhados no frontend
-frontend/src/lib/supabase/ Cliente e helpers de integração com Supabase
-supabase/functions/        Edge Functions (opcionais)
-supabase/migrations/       Migrações SQL versionadas
-supabase/seed.sql          Dados iniciais locais (opcional)
-docs/                      Ideias, decisões e documentação do projeto
+frontend/
+├── public/                    Arquivos estáticos
+└── src/
+    ├── assets/                Imagens, ícones e fontes
+    ├── components/            Componentes React reutilizáveis
+    ├── pages/                 Páginas/telas
+    ├── services/              Integrações e chamadas a APIs/Supabase
+    ├── hooks/                 Hooks React
+    ├── utils/                  Funções auxiliares
+    └── styles/                 Estilos globais e compartilhados
+backend/                        API separada, se necessária para o desafio
+├── src/
+│   ├── controllers/ routes/ services/
+│   └── models/ middleware/ utils/
+└── tests/                      Testes do backend, se houver
+supabase/
+├── migrations/                 Migrações SQL
+├── functions/                  Edge Functions opcionais
+├── seed/                       Seeds SQL organizados, se configurados
+└── seed.sql                    Seed padrão da CLI Supabase
+docs/
+├── PROJECT_CONTEXT.md           Desafio e objetivo do MVP
+├── ARCHITECTURE.md              Arquitetura escolhida
+├── TASKS.md                     Quadro do trio
+├── DECISIONS.md                 Decisões compartilhadas
+└── GIT_WORKFLOW.md              Fluxo de Git e GitHub
+AGENTS.md / CLAUDE.md            Instruções compartilhadas com agentes de IA
+.env.example / .gitignore       Variáveis de exemplo e exclusões do Git
+package.json                     Metadados do repositório
 ```
+
+O backend separado é opcional: use primeiro o Supabase para banco e autenticação. Definam linguagem e framework do backend somente se o MVP precisar.
 
 ## Documentação do projeto
 
@@ -29,10 +50,12 @@ docs/                      Ideias, decisões e documentação do projeto
 
 ## Começar quando o desafio for definido
 
-1. Inicialize o frontend React + TypeScript em `frontend/` usando Vite. Remova os arquivos `.gitkeep` de `frontend/` antes de gerar o app se a ferramenta solicitar uma pasta vazia.
+1. Inicialize o frontend React + TypeScript em `frontend/` usando Vite. Se solicitado, escolha manter/ignorar os arquivos existentes para preservar a estrutura preparada.
 2. Instale e configure a CLI do Supabase e execute `supabase init` na raiz do repositório. O comando cria `supabase/config.toml`; preserve as pastas preparadas aqui.
 3. Crie um projeto Supabase e copie a URL e a chave pública (anon/publishable) para um arquivo local `.env` baseado em `.env.example`.
 4. Nunca coloque chaves secretas, como `service_role` ou secret key, no frontend ou no Git. Guarde-as em secrets de Edge Functions.
+
+O Supabase CLI usa `supabase/seed.sql` por padrão. Para dividir seeds em `supabase/seed/`, configure `db.seed.sql_paths` em `supabase/config.toml` conforme a documentação da CLI.
 
 ## Variáveis de ambiente do frontend
 
