@@ -23,6 +23,10 @@ supabase/seed.sql          Dados iniciais locais (opcional)
 docs/                      Ideias, decisões e documentação do projeto
 ```
 
+## Documentação do projeto
+
+- [Fluxo de Git e GitHub para o trio](docs/GIT_WORKFLOW.md)
+
 ## Começar quando o desafio for definido
 
 1. Inicialize o frontend React + TypeScript em `frontend/` usando Vite. Remova os arquivos `.gitkeep` de `frontend/` antes de gerar o app se a ferramenta solicitar uma pasta vazia.
