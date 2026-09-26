@@ -225,6 +225,67 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- Venda para cliente não registrado
+-- ---------------------------------------------------------------------------
+
+select public.registrar_venda(
+  null,
+  jsonb_build_array(jsonb_build_object('produto_id', current_setting('app.produto'), 'quantidade', 1)),
+  'avulsa-1'
+);
+
+do $$
+declare v_estoque integer; v_mov integer; v_aluno uuid; v_gasto_nulo integer;
+begin
+  select quantidade into v_estoque from public.estoque where produto_id = current_setting('app.produto')::uuid;
+  select aluno_id into v_aluno from public.vendas where observacao = 'avulsa-1';
+  select count(*) into v_mov from public.movimentos_financeiros m
+    join public.vendas v on v.id = m.venda_id where v.observacao = 'avulsa-1';
+  select count(*) into v_gasto_nulo from public.gastos_mensais_alunos where aluno_id is null;
+  if v_estoque <> 100 then raise exception 'FALHOU: venda avulsa não baixou o estoque (veio %)', v_estoque; end if;
+  if v_aluno is not null then raise exception 'FALHOU: venda avulsa gravou aluno %', v_aluno; end if;
+  if v_mov <> 0 then raise exception 'FALHOU: venda avulsa gerou % movimentos no extrato', v_mov; end if;
+  if v_gasto_nulo <> 0 then raise exception 'FALHOU: venda avulsa apareceu no gasto mensal por aluno'; end if;
+end $$;
+
+select set_config('app.venda_avulsa', (select id::text from public.vendas where observacao = 'avulsa-1'), false);
+select public.cancelar_venda(current_setting('app.venda_avulsa')::uuid, 'Teste avulsa');
+
+do $$
+declare v_estoque integer; v_mov integer;
+begin
+  select quantidade into v_estoque from public.estoque where produto_id = current_setting('app.produto')::uuid;
+  select count(*) into v_mov from public.movimentos_financeiros where venda_id = current_setting('app.venda_avulsa')::uuid;
+  if v_estoque <> 101 then raise exception 'FALHOU: cancelar venda avulsa não devolveu ao estoque (veio %)', v_estoque; end if;
+  if v_mov <> 0 then raise exception 'FALHOU: cancelar venda avulsa gerou % movimentos', v_mov; end if;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- Prazo de cancelamento (24 horas)
+-- ---------------------------------------------------------------------------
+
+select public.registrar_venda(
+  null,
+  jsonb_build_array(jsonb_build_object('produto_id', current_setting('app.produto'), 'quantidade', 1)),
+  'antiga-1'
+);
+
+-- Envelhece a venda com privilégio de dono; authenticated não pode alterar vendas.
+reset role;
+update public.vendas set criado_em = now() - interval '25 hours' where observacao = 'antiga-1';
+set local role authenticated;
+
+do $$
+begin
+  begin
+    perform public.cancelar_venda((select id from public.vendas where observacao = 'antiga-1'), 'Tarde demais');
+    raise exception 'FALHOU: venda com mais de 24 horas foi cancelada';
+  exception when others then
+    if sqlerrm not like '%prazo para cancelar%' then raise; end if;
+  end;
+end $$;
+
+-- ---------------------------------------------------------------------------
 -- Vínculo da conta do aluno
 -- ---------------------------------------------------------------------------
 
