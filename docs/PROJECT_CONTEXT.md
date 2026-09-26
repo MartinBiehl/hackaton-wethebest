@@ -24,7 +24,7 @@ O app em `apps/vendas` já possui autenticação e telas para:
 
 ### Portal de pais e alunos
 
-O workspace `apps/portal` está inicializado. A camada de serviços já cobre cadastro, login, alunos, vínculos, cardápio, saldo, extrato, limite mensal, créditos e pedidos prévios. A interface final ainda não foi implementada: o `App.tsx` permanece com a tela inicial do Vite.
+O app em `apps/portal` já possui cadastro e login com navegação separada por papel. Alunos podem consultar o cardápio, montar o carrinho, agendar a retirada, acompanhar pedidos e solicitar créditos. Responsáveis podem consultar os alunos vinculados, saldos, extratos, compras e limites mensais. As telas consomem a camada de serviços do Supabase e compartilham tipos e utilitários com o app de vendas.
 
 ### Dados e regras de negócio
 
@@ -42,7 +42,7 @@ O Supabase compartilhado já contém o esquema versionado, políticas RLS e fun�
 
 - A primeira versão depende de internet; gravação offline e sincronização estão fora do escopo.
 - O PWA instalável do app de vendas ainda precisa ser configurado.
-- As telas do portal ainda precisam ser construídas sobre os serviços existentes.
+- Os fluxos do portal ainda precisam ser validados com contas e vínculos reais.
 - A confirmação de Pix é manual até a escolha do provedor e a implementação de uma Edge Function/webhook.
 - Faltam validar os fluxos completos com contas e dados reais, configurar os projetos da Vercel e definir os domínios finais.
 

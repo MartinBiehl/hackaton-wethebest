@@ -2,12 +2,12 @@
 
 Monorepo do iCarla, composto pelo sistema interno da cantina e pelo portal de pais e alunos. Os dois aplicativos usam React, TypeScript e Vite, compartilham código em um pacote próprio e acessam o mesmo projeto Supabase.
 
-> O app interno de vendas já possui os principais fluxos e telas. O portal está inicializado e tem a camada de integração com o Supabase, mas sua interface ainda está no scaffold do Vite.
+> Os dois aplicativos já possuem seus principais fluxos e telas conectados à camada de serviços do Supabase.
 
 ## Produtos
 
 - **iCarla Vendas (`apps/vendas`):** app interno da Carla para autenticação, registro e cancelamento de vendas, fechamento mensal, pedidos, pagamentos, produtos, estoque, alunos e intervalos de retirada.
-- **Portal (`apps/portal`):** app de pais e alunos. Os serviços de autenticação, vínculos, cardápio, saldo, extrato, créditos e pedidos já existem; as telas do produto ainda precisam ser implementadas.
+- **Portal (`apps/portal`):** app de pais e alunos com cadastro e login, cardápio, carrinho, agendamento e histórico de pedidos, créditos, extrato, limites e gestão dos alunos vinculados.
 
 As interfaces e os deploys são independentes, mas os dados, a autenticação e as regras de acesso ficam no mesmo Supabase. Grants, Row Level Security (RLS) e funções SQL aplicam as permissões no banco.
 
@@ -31,7 +31,12 @@ apps/
 └── portal/                    Portal de pais e alunos
     ├── public/
     └── src/
-        └── services/          Auth, alunos, vínculos, cardápio, créditos, extrato e pedidos
+        ├── components/        Layout, carrinho, resumo do pedido e elementos reutilizáveis
+        ├── hooks/             Sessão, aluno selecionado, carrinho e utilitários assíncronos
+        ├── pages/             Autenticação e áreas de aluno e responsável
+        ├── services/          Auth, alunos, vínculos, cardápio, créditos, extrato e pedidos
+        ├── styles/            Estilos globais do portal
+        └── utils/             Datas, erros, pedidos, rótulos e texto
 packages/
 └── shared/src/                Tipos do banco e utilitários de datas, dinheiro e erros
 supabase/
@@ -75,7 +80,7 @@ As migrações versionadas cobrem identidade e papéis, vínculos entre respons�
 
 ## Publicação
 
-Vendas e portal serão projetos separados na Vercel, com diretório, build e variáveis de ambiente próprios. O app de vendas já contém o rewrite de SPA; a configuração final dos projetos, dos domínios e do PWA instalável continua pendente.
+Vendas e portal serão projetos separados na Vercel, com diretório, build e variáveis de ambiente próprios. Os dois apps já contêm o rewrite de SPA; a configuração final dos projetos, dos domínios e do PWA instalável continua pendente.
 
 ## Documentação do projeto
 
@@ -84,16 +89,13 @@ Vendas e portal serão projetos separados na Vercel, com diretório, build e var
 - [Banco de dados](docs/DATABASE.md)
 - [Decisões](docs/DECISIONS.md)
 - [Tarefas](docs/TASKS.md)
+- [Uso de inteligência artificial](docs/AI_USAGE.md)
 - [Fluxo de Git e GitHub](docs/GIT_WORKFLOW.md)
 
 <details>
 <summary>Nota sobre uso de IA</summary>
 
-Foram produzidas integralmente por IA:
-
-- a tipagem do TypeScript;
-- as queries e migrações do banco de dados;
-- a transcrição das telas do Figma para React.
+O registro está em [Uso de inteligência artificial](docs/AI_USAGE.md).
 
 </details>
 

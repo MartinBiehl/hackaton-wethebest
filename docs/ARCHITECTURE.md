@@ -30,7 +30,16 @@ apps/
 │   └── vite.config.ts         Servidor local na porta 5173
 └── portal/                    Portal de pais e alunos
     ├── public/
-    ├── src/services/
+    ├── src/
+    │   ├── components/
+    │   ├── hooks/
+    │   ├── pages/
+    │   │   ├── aluno/
+    │   │   └── responsavel/
+    │   ├── services/
+    │   ├── styles/
+    │   └── utils/
+    ├── vercel.json            Rewrite da SPA
     └── vite.config.ts         Servidor local na porta 5174
 packages/
 └── shared/src/
@@ -70,7 +79,23 @@ Os componentes reutilizáveis ficam em `components/`; sessão e comportamento as
 
 ## Portal
 
-`apps/portal` já é um app Vite e consome `@wethebest/shared`. Sua camada `src/services` está dividida por domínio:
+`apps/portal` usa `react-router-dom`, consome `@wethebest/shared` e separa a navegação autenticada conforme o papel retornado pela sessão.
+
+Principais rotas:
+
+| Rota | Público | Responsabilidade |
+| --- | --- | --- |
+| `/cadastro` | Não autenticado | Criação de conta de aluno ou responsável. |
+| `/aluno` | Aluno | Cardápio e entrada da área do aluno. |
+| `/aluno/pedido` | Aluno | Carrinho e resumo do pedido. |
+| `/aluno/retirada` | Aluno | Data, intervalo e forma de pagamento. |
+| `/aluno/pedidos` e `/aluno/pedidos/:pedidoId` | Aluno | Histórico e detalhe dos pedidos. |
+| `/aluno/creditos` | Aluno | Solicitação e acompanhamento de créditos. |
+| `/responsavel` | Responsável | Visão dos alunos vinculados. |
+| `/responsavel/alunos/:alunoId/extrato` | Responsável | Extrato e compras do aluno. |
+| `/responsavel/alunos/:alunoId/limites` | Responsável | Limite mensal e créditos. |
+
+As telas compartilham layout, componentes de interface, tratamento de erros e um provedor de carrinho isolado por conta. A camada `src/services` está dividida por domínio:
 
 - `auth.ts`: cadastro, login, logout e sessão;
 - `alunos.ts` e `vinculos.ts`: contas, responsáveis, limites e aprovações;
@@ -78,8 +103,6 @@ Os componentes reutilizáveis ficam em `components/`; sessão e comportamento as
 - `creditos.ts`: solicitações de crédito e pagamentos;
 - `extrato.ts`: movimentos e compras;
 - `pedidos.ts`: criação e histórico de pedidos.
-
-A interface ainda é o scaffold inicial do Vite. Rotas, páginas e componentes do portal continuam como próxima etapa; os serviços existentes são a fronteira de dados que essas telas devem consumir.
 
 ## Pacote compartilhado
 
@@ -115,12 +138,12 @@ A matriz de permissões, as tabelas, as views e todas as RPCs estão detalhadas 
 
 Cada app usa seu próprio `.env.local`, ignorado pelo Git. Somente a URL do projeto e a chave pública anônima/publicável podem chegar ao frontend. `service_role`, secret keys, senhas e connection strings privilegiadas devem ficar fora do navegador, dos logs e do Git.
 
-Vendas e portal serão projetos Vercel independentes, cada um com diretório raiz, build e variáveis de ambiente próprios. O app de vendas já tem rewrite para rotas de SPA. Manifest, service worker e instalação como PWA ainda não foram configurados; a primeira versão continuará online.
+Vendas e portal serão projetos Vercel independentes, cada um com diretório raiz, build e variáveis de ambiente próprios. Os dois apps já têm rewrite para rotas de SPA. Manifest, service worker e instalação como PWA ainda não foram configurados; a primeira versão continuará online.
 
 ## Próximos passos arquiteturais
 
-1. Implementar as telas e rotas do portal sobre a camada de serviços existente.
+1. Validar as telas dos dois apps com contas, vínculos e dados reais.
 2. Configurar e validar o PWA do app de vendas.
 3. Integrar o provedor de Pix por Edge Function e restringir a confirmação manual.
-4. Testar os fluxos de ponta a ponta e o isolamento entre contas com dados reais.
+4. Testar os fluxos de ponta a ponta e o isolamento entre contas.
 5. Configurar os dois projetos Vercel e seus domínios.

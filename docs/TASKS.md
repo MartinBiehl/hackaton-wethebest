@@ -9,6 +9,7 @@ Estado consolidado em 2026-09-26. Dividam o trabalho por funcionalidade, indique
 - [x] Criar `packages/shared` com tipos do banco e utilitários de erros, dinheiro e datas.
 - [x] Versionar migrações, testes e configuração do Supabase em `supabase/`.
 - [x] Atualizar os documentos para refletir a estrutura implementada e registrar os Figma de [Desktop](https://www.figma.com/design/pv3RvxrhVU6F5TDJcmJq8B/Desktop?node-id=0-1&t=fUDQbVLkXjNGg9xc-1) e [Mobile iCarla](https://www.figma.com/design/TRpC2zJyvla20VRpTKnNKx/Mobile-Icarla?node-id=0-1&t=UoVuBK5LBWQocEJV-1).
+- [x] Registrar em [AI_USAGE.md](AI_USAGE.md) as partes produzidas integralmente por IA.
 
 ## Aplicativo iCarla — vendas
 
@@ -27,8 +28,10 @@ Estado consolidado em 2026-09-26. Dividam o trabalho por funcionalidade, indique
 - [x] Implementar serviços de cadastro, login e sessão.
 - [x] Implementar serviços de alunos, vínculos, saldo, extrato, compras e limite mensal.
 - [x] Implementar serviços de cardápio, créditos e pedidos prévios.
-- [ ] Substituir o scaffold do Vite pelas telas do portal.
-- [ ] Implementar navegação e estados autenticados para responsável e aluno.
+- [x] Substituir o scaffold do Vite pelas telas do portal.
+- [x] Implementar navegação e estados autenticados para responsável e aluno.
+- [x] Implementar cardápio, carrinho, agendamento, histórico de pedidos, créditos, extrato e limites.
+- [x] Configurar o rewrite de SPA para a Vercel.
 - [ ] Integrar e validar os fluxos do portal com as políticas RLS.
 
 ## Supabase e pagamentos
