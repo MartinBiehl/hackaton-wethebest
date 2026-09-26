@@ -2,7 +2,7 @@
 
 Repositório do sistema interno de vendas e do portal web para pais e alunos. A arquitetura-alvo é composta por dois aplicativos React + TypeScript com Vite, compartilhando um projeto Supabase.
 
-> A estrutura abaixo documenta a organização escolhida para a implementação. O repositório ainda contém o esqueleto inicial (`frontend/`, `backend/` e `supabase/`); esta documentação não significa que os aplicativos já foram criados ou que as pastas existentes foram migradas.
+> Os diretórios e workspaces dos dois produtos já foram criados. Os aplicativos ainda não foram inicializados com Vite e não contêm telas nem lógica de negócio.
 
 ## Produtos
 
@@ -15,29 +15,29 @@ Os dois produtos terão interfaces e deploys separados, mas usarão o mesmo Supa
 
 ```text
 apps/
-├── vendas/                    Aplicativo React + TypeScript + Vite da Carla
+├── vendas/                    Workspace do app da Carla
 │   ├── public/
-│   └── src/
-└── portal/                    Aplicativo React + TypeScript + Vite de pais e alunos
+│   ├── src/                    assets, components, hooks, pages, services, styles, utils
+│   └── package.json
+└── portal/                    Workspace do portal de pais e alunos
     ├── public/
-    └── src/
-packages/
-└── shared/                    Criar somente quando houver código realmente compartilhado
+    ├── src/                    assets, components, hooks, pages, services, styles, utils
+    └── package.json
 supabase/
 ├── migrations/                Alterações versionadas do banco e das políticas RLS
 ├── functions/                 Edge Functions para lógica privilegiada, se necessárias
 └── seed.sql
 docs/                           Contexto, decisões, arquitetura, tarefas e fluxo Git
-package.json                   Configuração npm workspaces na raiz
+package.json                   npm workspaces na raiz
 ```
 
-`backend/` separado não faz parte do caminho inicial. O acesso comum a dados pode usar `@supabase/supabase-js`; lógica privilegiada deve passar por uma Edge Function ou serviço server-side, nunca por uma chave secreta no navegador.
+Não há `backend/` separado no caminho inicial nem `packages/shared/` antes de existir código comum. O acesso comum a dados poderá usar `@supabase/supabase-js`; lógica privilegiada deve passar por uma Edge Function ou serviço server-side, nunca por uma chave secreta no navegador.
 
 ## Supabase e configuração local
 
 Os dois apps usam o mesmo `VITE_SUPABASE_URL` e a chave pública `VITE_SUPABASE_ANON_KEY` (ou publishable key). Cada app terá seu próprio `.env.local`, ignorado pelo Git, com esses valores. A chave pública só é segura com grants mínimos e RLS corretamente configurado para todas as tabelas expostas. Nunca inclua `service_role`, secret keys, senhas ou connection strings privilegiadas nos apps ou no Git.
 
-Ao iniciar os apps, configure npm workspaces no `package.json` da raiz e scripts para executar cada workspace. Este repositório ainda não contém esses apps ou scripts.
+Os dois diretórios já estão cadastrados como npm workspaces, com manifests mínimos para vendas e portal. Ainda falta inicializar cada workspace como app Vite e adicionar scripts de desenvolvimento/build quando a equipe começar essa implementação.
 
 ## Publicação
 

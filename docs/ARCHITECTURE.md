@@ -9,7 +9,7 @@ Um monorepo npm com dois aplicativos independentes em React + TypeScript + Vite:
 - `packages/shared`: opcional; adicionar apenas quando os apps tiverem código comum que valha a pena manter em um pacote.
 - `supabase/`: migrações SQL, seeds e Edge Functions opcionais.
 
-A árvore acima é a estrutura-alvo documentada. O repositório ainda não foi migrado de `frontend/` e não contém os aplicativos. A implementação e a migração de pastas são tarefas futuras.
+Os diretórios `apps/vendas` e `apps/portal` e os npm workspaces já existem. O scaffold anterior de `frontend/` foi movido para `apps/vendas`; `apps/portal` recebeu a mesma estrutura-base. Os manifests são mínimos: ainda faltam inicializar os apps Vite, adicionar código, dependências e scripts de execução.
 
 ## Fluxo de dados e acesso
 
@@ -36,4 +36,4 @@ Cada app terá um `.env.local` próprio, ignorado pelo Git, com `VITE_SUPABASE_U
 
 ## Estado atual e próximos passos
 
-O repositório contém um esqueleto inicial, não os apps descritos acima. A documentação define a direção sem criar telas, configurar serviços externos nem mover arquivos. Antes de produção, implementar os apps, definir e versionar o esquema e as políticas Supabase, configurar os projetos Vercel e validar login e isolamento de dados por papel/conta.
+O repositório contém a estrutura inicial dos workspaces, mas ainda não os apps funcionais. `packages/shared/` será criado somente quando surgir código compartilhado; backend separado permanece fora do caminho inicial. Próximos passos: inicializar Vite nos dois workspaces, definir e versionar o esquema e as políticas Supabase, configurar os projetos Vercel e validar login e isolamento de dados por papel/conta.

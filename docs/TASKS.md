@@ -4,8 +4,9 @@ Dividam o trabalho por funcionalidade e indiquem quem está atuando em cada tare
 
 ## Estrutura do monorepo
 
-- [ ] Definir branch de tarefa e migrar o esqueleto para `apps/vendas` e `apps/portal`.
-- [ ] Configurar npm workspaces e scripts por app; criar `packages/shared` apenas se houver código compartilhado.
+- [x] Mover o scaffold de frontend para `apps/vendas`, criar o scaffold de `apps/portal` e configurar npm workspaces.
+- [ ] Inicializar cada workspace como app React + TypeScript + Vite e adicionar scripts de desenvolvimento/build.
+- [ ] Criar `packages/shared` somente se surgir código realmente compartilhado.
 
 ## Aplicativo de vendas — responsável: a definir
 

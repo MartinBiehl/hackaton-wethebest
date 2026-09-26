@@ -2,5 +2,9 @@
   "name": "hackaton-wethebest",
   "version": "0.1.0",
   "private": true,
-  "description": "Projeto desenvolvido durante um hackathon."
+  "description": "Sistema de vendas e portal para pais e alunos.",
+  "workspaces": [
+    "apps/vendas",
+    "apps/portal"
+  ]
 }

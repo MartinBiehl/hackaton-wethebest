@@ -9,5 +9,6 @@ Registre decisões que afetem o trabalho da equipe para que todos, incluindo age
 | 2026-09-26 | Os dois apps usarão um projeto Supabase compartilhado (Auth e PostgreSQL), com acesso limitado por grants e RLS; lógica privilegiada fica em Edge Functions se necessária. | Centralizar os dados e autenticação sem confiar somente em controles da interface. |
 | 2026-09-26 | Vendas será um PWA instalável, online para consultar e registrar dados na primeira versão; portal e vendas serão projetos Vercel Pro independentes. | Permitir instalação simples para Carla e publicação separada dos dois produtos no mesmo repositório. |
 | 2026-09-26 | Domínios definitivos, esquema de dados e associações entre responsáveis/alunos ainda serão definidos antes da implementação correspondente. | Esses detalhes dependem de decisões de produto e não devem ser presumidos na documentação arquitetural. |
+| 2026-09-26 | Materializar a estrutura como npm workspaces em `apps/vendas` e `apps/portal`; remover o scaffold vazio de `backend/`; deixar `packages/shared/` para quando houver código comum. | Manter a estrutura de arquivos alinhada aos dois produtos e evitar um backend separado sem requisito. |
 
-As decisões descrevem a arquitetura planejada; a estrutura atual do repositório ainda não foi migrada e os aplicativos não estão implementados.
+Os diretórios e workspaces foram criados, mas os aplicativos ainda não foram inicializados com Vite nem implementados.

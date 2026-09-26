@@ -5,17 +5,13 @@ build/
 coverage/
 .vite/
 
-# Python backend (if selected)
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-.pytest_cache/
-
 # Local environment variables and secrets
 .env
 .env.*
 !.env.example
+
+# Vercel project metadata
+.vercel/
 
 # Supabase local state and temporary files
 supabase/.temp/
