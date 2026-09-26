@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { erroDoSupabase } from '../utils/erros'
+import { erroDoSupabase } from '@wethebest/shared'
 
 // Horários no formato "HH:MM", no fuso America/Sao_Paulo.
 export type Intervalo = { id: string; nome: string; inicio: string; fim: string; ativo: boolean }

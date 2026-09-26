@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { ErroNegocio, erroDoSupabase } from '../utils/erros'
+import { ErroNegocio, erroDoSupabase } from '@wethebest/shared'
 
 const BUCKET_FOTOS = 'produtos'
 const TIPOS_FOTO: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }

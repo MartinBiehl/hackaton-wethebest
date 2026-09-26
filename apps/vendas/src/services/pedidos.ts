@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
-import { erroDoSupabase } from '../utils/erros'
-import type { Database } from '../types/database'
+import { erroDoSupabase } from '@wethebest/shared'
+import type { Database } from '@wethebest/shared'
 
 export type StatusPedido = Database['public']['Enums']['status_pedido']
 

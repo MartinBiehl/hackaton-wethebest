@@ -5,8 +5,8 @@ const url = import.meta.env.VITE_SUPABASE_URL
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!url || !anonKey) {
-  throw new Error('Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY em apps/vendas/.env.local')
+  throw new Error('Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY em apps/portal/.env.local')
 }
 
-// Cliente único do app. Usa só a chave pública: quem limita o acesso é a RLS.
+// Cliente único do portal. Usa só a chave pública: quem limita o acesso é a RLS.
 export const supabase = createClient<Database>(url, anonKey)
