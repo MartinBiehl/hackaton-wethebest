@@ -49,6 +49,7 @@ Referências: [Vite na Vercel](https://vercel.com/docs/frameworks/frontend/vite)
 
 - [Contexto do projeto](docs/PROJECT_CONTEXT.md)
 - [Arquitetura](docs/ARCHITECTURE.md)
+- [Banco de dados](docs/DATABASE.md)
 - [Decisões](docs/DECISIONS.md)
 - [Tarefas](docs/TASKS.md)
 - [Fluxo de Git e GitHub](docs/GIT_WORKFLOW.md)

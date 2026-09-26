@@ -36,4 +36,8 @@ Cada app terá um `.env.local` próprio, ignorado pelo Git, com `VITE_SUPABASE_U
 
 ## Estado atual e próximos passos
 
-O repositório contém a estrutura inicial dos workspaces, mas ainda não os apps funcionais. `packages/shared/` será criado somente quando surgir código compartilhado; backend separado permanece fora do caminho inicial. Próximos passos: inicializar Vite nos dois workspaces, definir e versionar o esquema e as políticas Supabase, configurar os projetos Vercel e validar login e isolamento de dados por papel/conta.
+O repositório contém a estrutura inicial dos workspaces, mas ainda não os apps funcionais. `packages/shared/` será criado somente quando surgir código compartilhado; backend separado permanece fora do caminho inicial.
+
+O projeto Supabase está criado e vinculado à CLI (`supabase/config.toml`), e a primeira versão do banco já foi aplicada: perfis e papéis, vínculo N:N entre responsáveis e alunos, catálogo com estoque separado, vendas com snapshot de preço e extrato financeiro append-only, tudo com RLS e funções `SECURITY DEFINER` para as operações que exigem atomicidade. O modelo, a matriz de permissões e as pendências estão em [DATABASE.md](DATABASE.md).
+
+Próximos passos: inicializar Vite nos dois workspaces, conectar os apps ao Supabase, configurar os projetos Vercel e validar login e isolamento de dados por papel/conta na interface.
