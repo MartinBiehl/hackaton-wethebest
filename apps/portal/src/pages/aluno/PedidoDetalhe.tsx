@@ -38,7 +38,7 @@ function situacao(pedido: PedidoDetalhado): { titulo: string; texto: string; suc
 
 export function PedidoDetalhe() {
   const { pedidoId = '' } = useParams()
-  const { dados: pedido, erro, carregando, recarregar } = useAssincrono(() => buscarPedido(pedidoId), [pedidoId])
+  const { dados: pedido, erro, carregando, recarregar } = useAssincrono(() => buscarPedido(pedidoId), [pedidoId], 5000)
 
   if (pedido === null) {
     if (erro) return <Falha mensagem={erro} tentarDeNovo={recarregar} />

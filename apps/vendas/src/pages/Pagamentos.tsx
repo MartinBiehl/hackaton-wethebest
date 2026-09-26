@@ -22,7 +22,7 @@ const RESULTADOS: Record<ResultadoConfirmacao['status'], string> = {
 
 // Provisório até a integração com a API de Pix: a Carla confirma o que recebeu.
 export function Pagamentos() {
-  const pagamentos = useAssincrono(listarPagamentosAbertos, [])
+  const pagamentos = useAssincrono(listarPagamentosAbertos, [], 5000)
   const [confirmando, setConfirmando] = useState<PagamentoAberto | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)

@@ -38,6 +38,7 @@ export function Pedidos() {
   const pedidos = useAssincrono(
     () => listarPedidos(data, { intervaloId: intervaloId || undefined, status: FILTROS_STATUS[filtro].status }),
     [data, intervaloId, filtro],
+    5000,
   )
 
   async function finalizar(pedido: PedidoRetirada, entregue: boolean) {

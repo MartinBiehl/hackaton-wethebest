@@ -7,7 +7,7 @@ import { STATUS_PEDIDO } from '../../utils/rotulos'
 import { Carregando, Falha, Vazio } from '../../components/ui'
 
 export function MeusPedidos() {
-  const { dados: pedidos, erro, recarregar } = useAssincrono(() => listarPedidos(30), [])
+  const { dados: pedidos, erro, recarregar } = useAssincrono(() => listarPedidos(30), [], 5000)
 
   return (
     <div className="narrow-page">

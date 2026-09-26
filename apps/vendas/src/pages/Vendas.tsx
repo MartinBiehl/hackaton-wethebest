@@ -31,8 +31,8 @@ export function Vendas() {
     if (origem) filtro.origem = origem
     // O horário da carga decide quais vendas ainda mostram "Cancelar".
     return listarVendas(filtro).then((lista) => ({ lista, carregadoEm: Date.now() }))
-  }, [mes, aluno, cliente, origem])
-  const fiado = useAssincrono(fiadoEmAberto, [])
+  }, [mes, aluno, cliente, origem], 5000)
+  const fiado = useAssincrono(fiadoEmAberto, [], 5000)
 
   const visiveis = useMemo(() => {
     const palavras = texto.trim().toLowerCase().split(/\s+/).filter(Boolean)
