@@ -1,34 +1,158 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useCart, useProfile, useQuery, useService } from '../../hooks/portal'
-import Icon from '../../components/Icon'
-import { Empty, Metric, Notice } from '../../components/ui'
-import { Failure, Loading, NoStudent } from '../../components/PageState'
-import OrderSummary from '../../components/OrderSummary'
-import { filterProducts, money } from '../../utils/format'
-import type { Product } from '../../types'
+import { formatarCentavos } from '@wethebest/shared'
+import { listarCardapio, type ItemCardapio } from '../../services/cardapio'
+import { useAssincrono } from '../../hooks/useAssincrono'
+import { useAluno } from '../../hooks/useAluno'
+import { MAXIMO_POR_ITEM, useCarrinho } from '../../hooks/useCarrinho'
+import { normalizar, primeiroNome } from '../../utils/texto'
+import { Icone } from '../../components/Icone'
+import { ResumoPedido } from '../../components/ResumoPedido'
+import { Carregando, Falha, Indicador, Vazio } from '../../components/ui'
 
-export default function Cardapio() {
- const api = useService(), profile = useProfile(), cart = useCart()
- const query = useQuery(async () => ({ student: await api.getStudent(), products: await api.listProducts() }), 'catalogo:' + profile.id)
- const [search, setSearch] = useState(''), [category, setCategory] = useState('Todos'), [message, setMessage] = useState('')
- if (query.loading) return <Loading/>
- if (query.error) return <Failure message={query.error} retry={query.reload}/>
- if (!query.data?.student) return <NoStudent/>
- const { student, products } = query.data
- if (student.pendente) return <Notice>A conta do aluno aguarda aprovação do responsável.</Notice>
- const categories = ['Todos', ...new Set(products.map(p => p.categoria))]
- const filtered = filterProducts(products, search, category)
- function add(product: Product) {
-  const exists = cart.items.find(i => i.productId === product.id)
-  if ((exists?.quantidade || 0) >= 99) { setMessage('O limite por produto no carrinho é de 99 unidades.'); return }
-  cart.setItems(exists ? cart.items.map(i => i.productId === product.id ? { ...i, preco: product.preco, quantidade: i.quantidade + 1 } : i) : [...cart.items, { productId: product.id, nome: product.nome, preco: product.preco, quantidade: 1 }])
-  setMessage(product.nome + ' adicionado ao pedido.')
- }
- return <><section className="welcome-row"><h1>Olá, {profile.nome.split(' ')[0]}!</h1><div className="balance-pair"><Metric label="Saldo disponível" value={money(student.saldo)} accent/><Metric label="Limite mensal" value={student.limite === null ? 'Sem limite' : money(student.limite)}/></div></section>
- <div className="catalog-layout"><section><h2 className="section-title">Comprar na cantina</h2><label className="search-field"><Icon name="search" size={19}/><input type="search" aria-label="Pesquisar item" placeholder="Pesquisar item…" value={search} onChange={e => setSearch(e.target.value)}/></label><div className="categories" aria-label="Categorias">{categories.map(c => <button key={c} aria-pressed={c === category} className={c === category ? 'active' : ''} onClick={() => setCategory(c)}>{c}</button>)}</div>
- <p className="cart-feedback" role="status">{message || '\u00a0'}</p>
- {filtered.length ? <div className="products">{filtered.map(p => <article className="product-card" key={p.id}><div className="product-heading"><span className="product-icon"><Icon name={p.icon} size={23}/></span><div><h3>{p.nome}</h3><p>{p.categoria}</p></div></div><div className="product-bottom"><strong>{money(p.preco)}</strong><button className="button primary add-button" disabled={p.disponibilidade === 'indisponivel'} onClick={() => add(p)} aria-label={'Adicionar ' + p.nome}>{p.disponibilidade === 'indisponivel' ? 'Esgotado' : <><Icon name="plus" size={15}/>Adicionar</>}</button></div></article>)}</div> : <Empty title="Nenhum item encontrado" icon="search">Tente outro nome ou categoria.</Empty>}
- {products.some(p => p.disponibilidade === 'desconhecida') && <p className="fine-print left">A disponibilidade para retirada ainda precisa ser confirmada pela cantina.</p>}</section>
- <aside className="cart-aside">{cart.items.length ? <OrderSummary items={cart.items}><Link className="button primary full" to="/aluno/pedido">Continuar</Link></OrderSummary> : <section className="card"><Empty title="Meu pedido" icon="bag">Adicione produtos para montar seu lanche.</Empty></section>}</aside></div></>
+export function Cardapio() {
+  const { aluno } = useAluno()
+  const carrinho = useCarrinho()
+  const cardapio = useAssincrono(listarCardapio, [])
+  const [busca, setBusca] = useState('')
+  const [mensagem, setMensagem] = useState('')
+
+  function noCarrinho(produtoId: string): number {
+    return carrinho.itens.find((item) => item.produto_id === produtoId)?.quantidade ?? 0
+  }
+
+  function adicionar(produto: ItemCardapio) {
+    const atual = noCarrinho(produto.id)
+    if (atual >= Math.min(produto.disponivel, MAXIMO_POR_ITEM)) {
+      setMensagem(`Não há mais unidades de ${produto.nome} disponíveis agora.`)
+      return
+    }
+    carrinho.alterar(
+      atual
+        ? carrinho.itens.map((item) =>
+            item.produto_id === produto.id
+              ? { ...item, preco_centavos: produto.preco_centavos, quantidade: item.quantidade + 1 }
+              : item,
+          )
+        : [
+            ...carrinho.itens,
+            { produto_id: produto.id, nome: produto.nome, preco_centavos: produto.preco_centavos, quantidade: 1 },
+          ],
+    )
+    setMensagem(`${produto.nome} adicionado ao pedido.`)
+  }
+
+  const termo = normalizar(busca)
+  const produtos = (cardapio.dados ?? []).filter((produto) => normalizar(produto.nome).includes(termo))
+
+  return (
+    <>
+      <section className="welcome-row">
+        <h1>Olá, {primeiroNome(aluno.nome)}!</h1>
+        <div className="balance-pair">
+          <Indicador rotulo="Saldo disponível" valor={formatarCentavos(aluno.saldo_centavos)} destaque />
+          <Indicador
+            rotulo="Limite mensal"
+            valor={aluno.limite_mensal_centavos === null ? 'Sem limite' : formatarCentavos(aluno.limite_mensal_centavos)}
+          />
+        </div>
+      </section>
+
+      <div className="catalog-layout">
+        <section>
+          <h2 className="section-title">Comprar na cantina</h2>
+          <label className="search-field">
+            <Icone nome="busca" tamanho={19} />
+            <input
+              type="search"
+              aria-label="Pesquisar item"
+              placeholder="Pesquisar item…"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+            />
+          </label>
+          <p className="cart-feedback" role="status">
+            {mensagem || ' '}
+          </p>
+
+          {cardapio.erro && !cardapio.dados ? (
+            <Falha mensagem={cardapio.erro} tentarDeNovo={cardapio.recarregar} />
+          ) : !cardapio.dados ? (
+            <Carregando />
+          ) : produtos.length === 0 ? (
+            <Vazio titulo="Nenhum item encontrado" icone="busca">
+              {busca ? 'Tente outro nome.' : 'O cardápio ainda está vazio.'}
+            </Vazio>
+          ) : (
+            <div className="products">
+              {produtos.map((produto) => {
+                const esgotado = produto.disponivel <= 0
+                return (
+                  <article className="product-card" key={produto.id}>
+                    <div className="product-heading">
+                      {produto.foto_url ? (
+                        <img className="product-photo" src={produto.foto_url} alt="" loading="lazy" />
+                      ) : (
+                        <span className="product-icon">
+                          <Icone nome="lanche" tamanho={23} />
+                        </span>
+                      )}
+                      <div>
+                        <h3>{produto.nome}</h3>
+                        {produto.descricao && <p>{produto.descricao}</p>}
+                        <p>{esgotado ? 'Esgotado agora' : `${produto.disponivel} disponíveis agora`}</p>
+                      </div>
+                    </div>
+                    <div className="product-bottom">
+                      <strong>{formatarCentavos(produto.preco_centavos)}</strong>
+                      <button
+                        type="button"
+                        className="button primary add-button"
+                        disabled={esgotado}
+                        onClick={() => adicionar(produto)}
+                        aria-label={`Adicionar ${produto.nome}`}
+                      >
+                        {esgotado ? (
+                          'Esgotado'
+                        ) : (
+                          <>
+                            <Icone nome="mais" tamanho={15} />
+                            Adicionar
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+          <p className="fine-print left">O estoque não é reservado: o produto só fica garantido quando o pedido é pago.</p>
+        </section>
+
+        <aside className="cart-aside">
+          {carrinho.itens.length ? (
+            <ResumoPedido
+              linhas={carrinho.itens.map((item) => ({
+                chave: item.produto_id,
+                nome: item.nome,
+                quantidade: item.quantidade,
+                subtotal_centavos: item.preco_centavos * item.quantidade,
+              }))}
+            >
+              <Link className="button primary full" to="/aluno/pedido">
+                Continuar
+              </Link>
+            </ResumoPedido>
+          ) : (
+            <section className="card">
+              <Vazio titulo="Meu pedido" icone="sacola">
+                Adicione produtos para montar seu lanche.
+              </Vazio>
+            </section>
+          )}
+        </aside>
+      </div>
+    </>
+  )
 }

@@ -1,20 +1,125 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { useProfile, useQuery, useService } from '../../hooks/portal'
-import { Empty, Metric } from '../../components/ui'
-import { Back, Failure, Loading, NoStudent } from '../../components/PageState'
-import { currentMonth, money, shortDate } from '../../utils/format'
-export default function Extrato() {
- const { alunoId = '' } = useParams(), [params, setParams] = useSearchParams(), api = useService(), profile = useProfile()
- const rawMonth = params.get('mes') || currentMonth(), month = /^\d{4}-(0[1-9]|1[0-2])$/.test(rawMonth) ? rawMonth : currentMonth()
- const page = Math.max(0, Number.parseInt(params.get('pagina') || '0') || 0)
- const studentQuery = useQuery(() => api.getStudent(alunoId), 'extrato-aluno:' + profile.id + ':' + alunoId)
- const query = useQuery(() => api.statement(alunoId, month, page), 'extrato:' + profile.id + ':' + alunoId + ':' + month + ':' + page)
- if (studentQuery.loading) return <Loading/>
- if (studentQuery.error) return <Failure message={studentQuery.error} retry={studentQuery.reload}/>
- if (!studentQuery.data) return <NoStudent/>
- const student = studentQuery.data
- function changePage(next: number) { setParams({ mes: month, pagina: String(next) }) }
- return <div className="narrow-page"><Back to="/responsavel"/><div className="page-heading"><h1>Extrato de {student.nome}</h1><p className="muted">Compras recentes e movimentações da conta.</p></div><label className="period-field">Período do extrato<input aria-label="Mês do extrato" type="month" value={month} onChange={e => { if (e.target.value) setParams({ mes: e.target.value, pagina: '0' }) }}/></label>
- {query.loading ? <Loading/> : query.error ? <Failure message={query.error} retry={query.reload}/> : <><Metric label="TOTAL GASTO NO MÊS SELECIONADO" value={money(query.data!.totalExpense)} accent/><section className="card statement-list">{query.data!.entries.length ? query.data!.entries.map(m => <article className="movement" key={m.id}><div className="movement-heading"><div><h3>{m.tipo === 'compra' ? 'Compra na cantina' : m.tipo === 'estorno' ? 'Estorno' : m.tipo === 'credito' ? 'Crédito adicionado' : m.descricao}</h3><small>{shortDate(m.data)} · {new Date(m.data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}</small></div><strong className={m.valor > 0 ? 'positive' : ''}>{m.valor > 0 ? '+ ' : ''}{money(m.valor)}</strong></div>{m.itens.map((i, index) => <div className="statement-item" key={index}><div><strong>{i.nome}</strong><small>Qtd. {i.quantidade} · {money(i.preco)}</small></div><b>{money(i.preco * i.quantidade)}</b></div>)}{!m.itens.length && <p className="muted small">{m.descricao}</p>}</article>) : <Empty title="Nenhuma movimentação neste mês">Selecione outro período para consultar o histórico.</Empty>}</section><div className="pagination"><button className="button secondary" disabled={page === 0} onClick={() => changePage(page - 1)}>Anterior</button><span>Página {page + 1} de {Math.max(1, Math.ceil(query.data!.totalCount / 20))}<small>{query.data!.totalCount} movimentações</small></span><button className="button secondary" disabled={(page + 1) * 20 >= query.data!.totalCount} onClick={() => changePage(page + 1)}>Próxima</button></div></>}
- <Link className="button primary full spaced" to={'/responsavel/alunos/' + alunoId + '/limites'}>Limites e créditos</Link></div>
+import { formatarCentavos } from '@wethebest/shared'
+import { listarAlunos } from '../../services/alunos'
+import { listarExtratoDoMes, MOVIMENTOS_POR_PAGINA } from '../../services/extrato'
+import { useAssincrono } from '../../hooks/useAssincrono'
+import { dataHora, mesAtual, mesValido } from '../../utils/datas'
+import { TIPO_MOVIMENTO } from '../../utils/rotulos'
+import { Carregando, Falha, Indicador, Vazio, Voltar } from '../../components/ui'
+
+export function Extrato() {
+  const { alunoId = '' } = useParams()
+  const [parametros, setParametros] = useSearchParams()
+  const mesInformado = parametros.get('mes') ?? ''
+  const mes = mesValido(mesInformado) ? mesInformado : mesAtual()
+  const pagina = Math.max(0, Number.parseInt(parametros.get('pagina') ?? '0', 10) || 0)
+
+  const aluno = useAssincrono(async () => (await listarAlunos()).find((a) => a.id === alunoId) ?? null, [alunoId])
+  const extrato = useAssincrono(() => listarExtratoDoMes(alunoId, mes, pagina), [alunoId, mes, pagina])
+
+  if (aluno.dados === null) {
+    if (aluno.erro) return <Falha mensagem={aluno.erro} tentarDeNovo={aluno.recarregar} />
+    if (aluno.carregando) return <Carregando />
+    return (
+      <div className="narrow-page">
+        <Voltar para="/responsavel" />
+        <section className="card">
+          <Vazio titulo="Aluno não disponível" icone="usuarios">
+            O aluno não está vinculado a esta conta.
+          </Vazio>
+        </section>
+      </div>
+    )
+  }
+
+  const totalPaginas = Math.max(1, Math.ceil((extrato.dados?.totalMovimentos ?? 0) / MOVIMENTOS_POR_PAGINA))
+
+  return (
+    <div className="narrow-page">
+      <Voltar para="/responsavel" />
+      <div className="page-heading">
+        <h1>Extrato de {aluno.dados.nome}</h1>
+        <p className="muted">Compras, créditos e pagamentos da conta na cantina.</p>
+      </div>
+      <label className="period-field">
+        Mês do extrato
+        <input
+          type="month"
+          value={mes}
+          max={mesAtual()}
+          onChange={(e) => e.target.value && setParametros({ mes: e.target.value, pagina: '0' })}
+        />
+      </label>
+
+      {!extrato.dados ? (
+        extrato.erro ? (
+          <Falha mensagem={extrato.erro} tentarDeNovo={extrato.recarregar} />
+        ) : (
+          <Carregando />
+        )
+      ) : (
+        <>
+          <Indicador rotulo="Total gasto no mês" valor={formatarCentavos(extrato.dados.gastoCentavos)} destaque />
+          <section className="card statement-list">
+            {extrato.dados.movimentos.length ? (
+              extrato.dados.movimentos.map((movimento) => (
+                <article className="movement" key={movimento.id}>
+                  <div className="movement-heading">
+                    <div>
+                      <h3>{TIPO_MOVIMENTO[movimento.tipo]}</h3>
+                      <small>{dataHora(movimento.criado_em)}</small>
+                    </div>
+                    <strong className={movimento.valor_centavos > 0 ? 'positive' : ''}>
+                      {movimento.valor_centavos > 0 ? '+ ' : ''}
+                      {formatarCentavos(movimento.valor_centavos)}
+                    </strong>
+                  </div>
+                  {movimento.itens.map((item, indice) => (
+                    <div className="statement-item" key={indice}>
+                      <div>
+                        <strong>{item.nome_produto}</strong>
+                        <small>
+                          Qtd. {item.quantidade} · {formatarCentavos(item.preco_unitario_centavos)}
+                        </small>
+                      </div>
+                      <b>{formatarCentavos(item.subtotal_centavos)}</b>
+                    </div>
+                  ))}
+                  {!movimento.itens.length && movimento.descricao && <p className="muted small">{movimento.descricao}</p>}
+                </article>
+              ))
+            ) : (
+              <Vazio titulo="Nenhuma movimentação neste mês">Escolha outro mês para consultar o histórico.</Vazio>
+            )}
+          </section>
+          <div className="pagination">
+            <button
+              type="button"
+              className="button secondary"
+              disabled={pagina === 0}
+              onClick={() => setParametros({ mes, pagina: String(pagina - 1) })}
+            >
+              Anterior
+            </button>
+            <span>
+              Página {pagina + 1} de {totalPaginas}
+              <small>{extrato.dados.totalMovimentos} movimentações</small>
+            </span>
+            <button
+              type="button"
+              className="button secondary"
+              disabled={pagina + 1 >= totalPaginas}
+              onClick={() => setParametros({ mes, pagina: String(pagina + 1) })}
+            >
+              Próxima
+            </button>
+          </div>
+        </>
+      )}
+
+      <Link className="button primary full spaced" to={`/responsavel/alunos/${alunoId}/limites`}>
+        Limites e créditos
+      </Link>
+    </div>
+  )
 }
