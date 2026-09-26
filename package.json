@@ -5,9 +5,7 @@
   "description": "Sistema de vendas e portal para pais e alunos.",
   "workspaces": [
     "apps/vendas",
-    "apps/portal"
-  ],
-  "dependencies": {
-    "esbuild-wasm": "^0.28.2"
-  }
+    "apps/portal",
+    "packages/shared"
+  ]
 }

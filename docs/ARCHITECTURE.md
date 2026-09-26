@@ -6,7 +6,7 @@ Um monorepo npm com dois aplicativos independentes em React + TypeScript + Vite:
 
 - `apps/vendas`: sistema interno de Carla para lançar vendas e consultar o mês.
 - `apps/portal`: portal web de pais e alunos, com login e páginas de informações autorizadas.
-- `packages/shared`: opcional; adicionar apenas quando os apps tiverem código comum que valha a pena manter em um pacote.
+- `packages/shared`: código comum aos dois apps (tipos do banco, erros, dinheiro e datas), consumido direto do código-fonte.
 - `supabase/`: migrações SQL, seeds e Edge Functions opcionais.
 
 Os diretórios `apps/vendas` e `apps/portal` e os npm workspaces já existem. O scaffold anterior de `frontend/` foi movido para `apps/vendas`; `apps/portal` recebeu a mesma estrutura-base. Os manifests são mínimos: ainda faltam inicializar os apps Vite, adicionar código, dependências e scripts de execução.
@@ -36,7 +36,7 @@ Cada app terá um `.env.local` próprio, ignorado pelo Git, com `VITE_SUPABASE_U
 
 ## Estado atual e próximos passos
 
-O repositório contém a estrutura inicial dos workspaces, mas ainda não os apps funcionais. `packages/shared/` será criado somente quando surgir código compartilhado; backend separado permanece fora do caminho inicial.
+Os dois apps já são projetos Vite com a camada de dados (`src/services`) implementada. O app de vendas tem as telas da Carla (login, vendas do mês, nova venda, fechamento mensal, fila de pedidos, pagamentos Pix e cadastros), com `react-router-dom` e rewrite de SPA em `apps/vendas/vercel.json`; as telas do portal estão em andamento. `packages/shared/` guarda o código comum; backend separado permanece fora do caminho inicial.
 
 O projeto Supabase está criado e vinculado à CLI (`supabase/config.toml`), e a primeira versão do banco já foi aplicada: perfis e papéis, vínculo N:N entre responsáveis e alunos, catálogo com estoque separado, vendas com snapshot de preço e extrato financeiro append-only, tudo com RLS e funções `SECURITY DEFINER` para as operações que exigem atomicidade. O modelo, a matriz de permissões e as pendências estão em [DATABASE.md](DATABASE.md).
 

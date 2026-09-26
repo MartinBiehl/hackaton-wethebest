@@ -1,13 +1,19 @@
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import { ErroNegocio, erroDoSupabase } from '../utils/erros'
-import type { Database } from '../types/database'
+import { ErroNegocio, erroDoSupabase } from '@wethebest/shared'
+import type { Database } from '@wethebest/shared'
 
 export type Perfil = Pick<Database['public']['Tables']['perfis']['Row'], 'id' | 'nome' | 'email' | 'papel'>
 
 export async function entrar(email: string, senha: string): Promise<Perfil> {
-  const { error } = await supabase.auth.signInWithPassword({ email, password: senha })
-  if (error) throw new ErroNegocio('login_invalido', 'E-mail ou senha incorretos.')
+  const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: senha })
+  if (error?.code === 'invalid_credentials') {
+    throw new ErroNegocio('login_invalido', 'E-mail ou senha incorretos.')
+  }
+  if (error?.code === 'email_not_confirmed') {
+    throw new ErroNegocio('email_nao_confirmado', 'O e-mail desta conta ainda não foi confirmado.')
+  }
+  if (error) throw new ErroNegocio(error.code ?? null, `Não foi possível entrar: ${error.message}`)
 
   const perfil = await perfilAtual()
   // Só experiência de uso: quem de fato bloqueia outras contas é a RLS.

@@ -89,11 +89,39 @@ begin
 end $$;
 
 select public.definir_limite_mensal(current_setting('app.aluno')::uuid, 5000);
-select public.adicionar_credito(current_setting('app.aluno')::uuid, 2000, 'Crédito inicial');
+
+-- Crédito só vale depois de pago: a solicitação não muda o saldo.
+select set_config('app.pag_credito',
+  public.solicitar_credito(current_setting('app.aluno')::uuid, 2000) ->> 'pagamento_id', false);
 
 do $$
 declare v_saldo bigint;
 begin
+  select coalesce(sum(valor_centavos), 0) into v_saldo from public.movimentos_financeiros
+   where aluno_id = current_setting('app.aluno')::uuid;
+  if v_saldo <> 0 then
+    raise exception 'FALHOU: crédito entrou no saldo antes de ser pago (saldo %)', v_saldo;
+  end if;
+
+  begin
+    perform public.adicionar_credito(current_setting('app.aluno')::uuid, 2000, 'Sem pagar');
+    raise exception 'FALHOU: responsável lançou crédito sem pagamento';
+  exception when insufficient_privilege then
+    null; -- esperado: adicionar_credito não é mais executável por clientes
+  end;
+end $$;
+
+-- A equipe confirma o Pix (provisório até a integração da API).
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+select public.confirmar_pagamento(current_setting('app.pag_credito')::uuid);
+
+do $$
+declare v_saldo bigint;
+begin
+  if public.confirmar_pagamento(current_setting('app.pag_credito')::uuid) ->> 'status' <> 'ja_confirmado' then
+    raise exception 'FALHOU: segunda confirmação não foi tratada como repetida';
+  end if;
+
   select saldo_centavos into v_saldo from public.saldos_alunos
    where aluno_id = current_setting('app.aluno')::uuid;
   if v_saldo <> 2000 then
@@ -324,13 +352,299 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
+-- Cardápio: foto e estoque visível
+-- ---------------------------------------------------------------------------
+
+-- Aluno enxerga o estoque de produto ativo (para o cardápio mostrar disponibilidade).
+do $$
+begin
+  if not exists (select 1 from public.estoque where produto_id = current_setting('app.produto')::uuid) then
+    raise exception 'FALHOU: aluno não enxerga o estoque do produto ativo';
+  end if;
+end $$;
+
+-- Só a equipe envia fotos ao bucket "produtos".
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+begin
+  begin
+    insert into storage.objects (bucket_id, name) values ('produtos', 'teste/mae.png');
+    raise exception 'FALHOU: responsável enviou foto ao cardápio';
+  exception when insufficient_privilege then
+    null; -- esperado: bloqueado pela RLS do Storage
+  end;
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+insert into storage.objects (bucket_id, name) values ('produtos', 'teste/carla.png');
+
+-- ---------------------------------------------------------------------------
+-- Pedidos prévios
+-- ---------------------------------------------------------------------------
+
+-- Intervalos: um sempre aberto para amanhã e um que já fechou hoje.
+insert into public.intervalos_retirada (nome, inicio, fim) values
+  ('Teste almoço', '12:00', '12:30'),
+  ('Teste madrugada', '00:00', '00:30');
+select set_config('app.intervalo', (select id::text from public.intervalos_retirada where nome = 'Teste almoço'), false);
+select set_config('app.intervalo_fechado', (select id::text from public.intervalos_retirada where nome = 'Teste madrugada'), false);
+select set_config('app.amanha', ((now() at time zone 'America/Sao_Paulo')::date + 1)::text, false);
+select set_config('app.hoje', ((now() at time zone 'America/Sao_Paulo')::date)::text, false);
+
+-- Responsável não faz pedido; só o aluno.
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+do $$
+begin
+  begin
+    perform public.criar_pedido(current_setting('app.intervalo')::uuid, current_setting('app.amanha')::date,
+      jsonb_build_array(jsonb_build_object('produto_id', current_setting('app.produto'), 'quantidade', 1)), 'saldo');
+    raise exception 'FALHOU: responsável criou pedido';
+  exception when insufficient_privilege then
+    null; -- esperado
+  end;
+end $$;
+
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+
+-- Saldo 0: pedido pago com saldo é recusado (sem fiado em pedido).
+do $$
+declare v_det text;
+begin
+  begin
+    perform public.criar_pedido(current_setting('app.intervalo')::uuid, current_setting('app.amanha')::date,
+      jsonb_build_array(jsonb_build_object('produto_id', current_setting('app.produto'), 'quantidade', 1)), 'saldo');
+    raise exception 'FALHOU: pedido com saldo insuficiente foi aceito';
+  exception when others then
+    get stacked diagnostics v_det = pg_exception_detail;
+    if v_det is distinct from 'saldo_insuficiente' then raise; end if;
+  end;
+end $$;
+
+-- Fora do prazo: depois de amanhã, ou intervalo que já fechou.
+do $$
+declare v_det text;
+begin
+  begin
+    perform public.criar_pedido(current_setting('app.intervalo')::uuid, current_setting('app.amanha')::date + 1,
+      jsonb_build_array(jsonb_build_object('produto_id', current_setting('app.produto'), 'quantidade', 1)), 'pix');
+    raise exception 'FALHOU: pedido para depois de amanhã foi aceito';
+  exception when others then
+    get stacked diagnostics v_det = pg_exception_detail;
+    if v_det is distinct from 'pedido_fora_do_prazo' then raise; end if;
+  end;
+
+  begin
+    perform public.criar_pedido(current_setting('app.intervalo_fechado')::uuid, current_setting('app.hoje')::date,
+      jsonb_build_array(jsonb_build_object('produto_id', current_setting('app.produto'), 'quantidade', 1)), 'pix');
+    raise exception 'FALHOU: pedido para intervalo já fechado foi aceito';
+  exception when others then
+    get stacked diagnostics v_det = pg_exception_detail;
+    if v_det is distinct from 'pedido_fora_do_prazo' then raise; end if;
+  end;
+end $$;
+
+-- O próprio aluno compra crédito; a equipe confirma.
+select set_config('app.pag_aluno',
+  public.solicitar_credito(current_setting('app.aluno')::uuid, 1000) ->> 'pagamento_id', false);
+
+do $$
+begin
+  begin
+    perform public.confirmar_pagamento(current_setting('app.pag_aluno')::uuid);
+    raise exception 'FALHOU: aluno confirmou o próprio pagamento';
+  exception when insufficient_privilege then
+    null; -- esperado
+  end;
+end $$;
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+select public.confirmar_pagamento(current_setting('app.pag_aluno')::uuid);
+
+-- Pedido pago com saldo: efetiva na hora, baixa estoque e vira venda de origem 'pedido'.
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+select set_config('app.pedido_saldo',
+  public.criar_pedido(current_setting('app.intervalo')::uuid, current_setting('app.amanha')::date,
+    jsonb_build_array(jsonb_build_object('produto_id', current_setting('app.produto'), 'quantidade', 1)), 'saldo')
+  ->> 'pedido_id', false);
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare v_status text; v_origem text; v_estoque integer; v_saldo bigint;
+begin
+  select p.status::text, v.origem into v_status, v_origem
+    from public.pedidos p join public.vendas v on v.id = p.venda_id
+    where p.id = current_setting('app.pedido_saldo')::uuid;
+  select quantidade into v_estoque from public.estoque where produto_id = current_setting('app.produto')::uuid;
+  select saldo_centavos into v_saldo from public.saldos_alunos where aluno_id = current_setting('app.aluno')::uuid;
+  if v_status <> 'pago' or v_origem <> 'pedido' then
+    raise exception 'FALHOU: pedido com saldo deveria estar pago com venda de origem pedido (%, %)', v_status, v_origem;
+  end if;
+  if v_estoque <> 99 then raise exception 'FALHOU: pedido com saldo não baixou o estoque (veio %)', v_estoque; end if;
+  if v_saldo <> 0 then raise exception 'FALHOU: saldo após pedido deveria ser 0, veio %', v_saldo; end if;
+end $$;
+
+-- Pedido com Pix: não mexe no estoque até o pagamento ser confirmado.
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+select set_config('app.pedido_pix',
+  public.criar_pedido(current_setting('app.intervalo')::uuid, current_setting('app.amanha')::date,
+    jsonb_build_array(jsonb_build_object('produto_id', current_setting('app.produto'), 'quantidade', 2)), 'pix')
+  ->> 'pedido_id', false);
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+select set_config('app.pag_pedido',
+  (select id::text from public.pagamentos where pedido_id = current_setting('app.pedido_pix')::uuid), false);
+
+do $$
+declare v_estoque integer;
+begin
+  select quantidade into v_estoque from public.estoque where produto_id = current_setting('app.produto')::uuid;
+  if v_estoque <> 99 then raise exception 'FALHOU: pedido Pix pendente reservou estoque (veio %)', v_estoque; end if;
+end $$;
+
+select public.confirmar_pagamento(current_setting('app.pag_pedido')::uuid);
+
+do $$
+declare v_status text; v_estoque integer; v_saldo bigint; v_creditos integer;
+begin
+  select status::text into v_status from public.pedidos where id = current_setting('app.pedido_pix')::uuid;
+  select quantidade into v_estoque from public.estoque where produto_id = current_setting('app.produto')::uuid;
+  select saldo_centavos into v_saldo from public.saldos_alunos where aluno_id = current_setting('app.aluno')::uuid;
+  if public.confirmar_pagamento(current_setting('app.pag_pedido')::uuid) ->> 'status' <> 'ja_confirmado' then
+    raise exception 'FALHOU: confirmação repetida do pedido não foi tratada como repetida';
+  end if;
+  select count(*) into v_creditos from public.movimentos_financeiros
+    where pagamento_id = current_setting('app.pag_pedido')::uuid;
+  if v_status <> 'pago' then raise exception 'FALHOU: pedido Pix confirmado deveria estar pago, veio %', v_status; end if;
+  if v_estoque <> 97 then raise exception 'FALHOU: confirmação do Pix não baixou o estoque (veio %)', v_estoque; end if;
+  if v_saldo <> 0 then raise exception 'FALHOU: Pix do pedido deveria entrar e sair do saldo (saldo %)', v_saldo; end if;
+  if v_creditos <> 1 then raise exception 'FALHOU: pagamento gerou % créditos', v_creditos; end if;
+end $$;
+
+-- Estoque esgotado entre o pedido e o pagamento: pedido recusado, valor vira crédito.
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+select set_config('app.pedido_sem_estoque',
+  public.criar_pedido(current_setting('app.intervalo')::uuid, current_setting('app.amanha')::date,
+    jsonb_build_array(jsonb_build_object('produto_id', current_setting('app.produto'), 'quantidade', 1)), 'pix')
+  ->> 'pedido_id', false);
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+update public.estoque set quantidade = 0 where produto_id = current_setting('app.produto')::uuid;
+
+do $$
+declare v_resultado jsonb; v_status text; v_saldo bigint;
+begin
+  v_resultado := public.confirmar_pagamento(
+    (select id from public.pagamentos where pedido_id = current_setting('app.pedido_sem_estoque')::uuid));
+  select status::text into v_status from public.pedidos where id = current_setting('app.pedido_sem_estoque')::uuid;
+  select saldo_centavos into v_saldo from public.saldos_alunos where aluno_id = current_setting('app.aluno')::uuid;
+  if v_resultado ->> 'status' <> 'pedido_recusado' or v_status <> 'recusado' then
+    raise exception 'FALHOU: pedido sem estoque deveria ser recusado (%, %)', v_resultado ->> 'status', v_status;
+  end if;
+  if v_saldo <> 1000 then raise exception 'FALHOU: valor do pedido recusado deveria virar crédito (saldo %)', v_saldo; end if;
+end $$;
+
+update public.estoque set quantidade = 50 where produto_id = current_setting('app.produto')::uuid;
+
+-- Pix não pago no prazo expira; se o dinheiro chegar depois, vira crédito.
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+select set_config('app.pedido_expira',
+  public.criar_pedido(current_setting('app.intervalo')::uuid, current_setting('app.amanha')::date,
+    jsonb_build_array(jsonb_build_object('produto_id', current_setting('app.produto'), 'quantidade', 1)), 'pix')
+  ->> 'pedido_id', false);
+
+reset role;
+update public.pagamentos set expira_em = now() - interval '1 minute'
+  where pedido_id = current_setting('app.pedido_expira')::uuid;
+set local role authenticated;
+
+select public.expirar_pendentes();
+
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+do $$
+declare v_status text; v_resultado jsonb; v_saldo bigint; v_estoque integer;
+begin
+  select status::text into v_status from public.pedidos where id = current_setting('app.pedido_expira')::uuid;
+  if v_status <> 'expirado' then raise exception 'FALHOU: pedido com Pix vencido deveria expirar, veio %', v_status; end if;
+
+  v_resultado := public.confirmar_pagamento(
+    (select id from public.pagamentos where pedido_id = current_setting('app.pedido_expira')::uuid));
+  select saldo_centavos into v_saldo from public.saldos_alunos where aluno_id = current_setting('app.aluno')::uuid;
+  select quantidade into v_estoque from public.estoque where produto_id = current_setting('app.produto')::uuid;
+  if v_resultado ->> 'status' <> 'pedido_expirado' then
+    raise exception 'FALHOU: Pix confirmado após o prazo deveria manter o pedido expirado, veio %', v_resultado ->> 'status';
+  end if;
+  if v_saldo <> 2000 then raise exception 'FALHOU: Pix atrasado deveria virar crédito (saldo %)', v_saldo; end if;
+  if v_estoque <> 50 then raise exception 'FALHOU: pedido expirado baixou estoque (veio %)', v_estoque; end if;
+end $$;
+
+-- Pedido conta no limite mensal (gasto do mês: 2000 balcão + 1000 + 2000 de pedidos).
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+select public.definir_limite_mensal(current_setting('app.aluno')::uuid, 5000);
+
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+do $$
+declare v_det text;
+begin
+  begin
+    perform public.criar_pedido(current_setting('app.intervalo')::uuid, current_setting('app.amanha')::date,
+      jsonb_build_array(jsonb_build_object('produto_id', current_setting('app.produto'), 'quantidade', 1)), 'saldo');
+    raise exception 'FALHOU: pedido acima do limite mensal foi aceito';
+  exception when others then
+    get stacked diagnostics v_det = pg_exception_detail;
+    if v_det is distinct from 'limite_mensal_excedido' then raise; end if;
+  end;
+end $$;
+
+set local request.jwt.claims = '{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}';
+select public.definir_limite_mensal(current_setting('app.aluno')::uuid, null);
+
+-- Retirada: a equipe marca como entregue, e não dá para finalizar de novo.
+set local request.jwt.claims = '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
+select public.finalizar_pedido(current_setting('app.pedido_saldo')::uuid, true);
+
+do $$
+declare v_det text;
+begin
+  if (select status::text from public.pedidos where id = current_setting('app.pedido_saldo')::uuid) <> 'entregue' then
+    raise exception 'FALHOU: pedido não ficou como entregue';
+  end if;
+  begin
+    perform public.finalizar_pedido(current_setting('app.pedido_saldo')::uuid, false);
+    raise exception 'FALHOU: pedido entregue foi finalizado de novo';
+  exception when others then
+    get stacked diagnostics v_det = pg_exception_detail;
+    if v_det is distinct from 'pedido_invalido' then raise; end if;
+  end;
+end $$;
+
+-- Cancelar a venda de um pedido encerra o pedido e estorna.
+select public.cancelar_venda(
+  (select venda_id from public.pedidos where id = current_setting('app.pedido_pix')::uuid), 'Teste pedido');
+
+do $$
+declare v_status text; v_saldo bigint;
+begin
+  select status::text into v_status from public.pedidos where id = current_setting('app.pedido_pix')::uuid;
+  select saldo_centavos into v_saldo from public.saldos_alunos where aluno_id = current_setting('app.aluno')::uuid;
+  if v_status <> 'cancelado' then raise exception 'FALHOU: pedido da venda cancelada ficou %', v_status; end if;
+  if v_saldo <> 4000 then raise exception 'FALHOU: estorno do pedido cancelado (saldo %)', v_saldo; end if;
+end $$;
+
+set local request.jwt.claims = '{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated"}';
+
+-- ---------------------------------------------------------------------------
 -- Isolamento entre contas
 -- ---------------------------------------------------------------------------
 
 set local request.jwt.claims = '{"sub":"44444444-4444-4444-4444-444444444444","role":"authenticated"}';
 do $$
-declare v_alunos integer; v_mov integer; v_vendas integer; v_itens integer;
+declare v_alunos integer; v_mov integer; v_vendas integer; v_itens integer; v_pedidos integer; v_pag integer;
 begin
+  select count(*) into v_pedidos from public.pedidos;
+  select count(*) into v_pag from public.pagamentos;
+  if v_pedidos <> 0 or v_pag <> 0 then
+    raise exception 'FALHOU: conta sem vínculo enxergou pedidos (%) ou pagamentos (%)', v_pedidos, v_pag;
+  end if;
   select count(*) into v_alunos from public.alunos;
   select count(*) into v_mov from public.movimentos_financeiros;
   select count(*) into v_vendas from public.vendas;

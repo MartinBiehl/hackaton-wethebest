@@ -31,13 +31,13 @@ docs/                           Contexto, decisões, arquitetura, tarefas e flux
 package.json                   npm workspaces na raiz
 ```
 
-Não há `backend/` separado no caminho inicial nem `packages/shared/` antes de existir código comum. O acesso comum a dados poderá usar `@supabase/supabase-js`; lógica privilegiada deve passar por uma Edge Function ou serviço server-side, nunca por uma chave secreta no navegador.
+Não há `backend/` separado no caminho inicial. `packages/shared/` guarda o código comum aos dois apps (tipos do banco, erros, dinheiro e datas). O acesso comum a dados poderá usar `@supabase/supabase-js`; lógica privilegiada deve passar por uma Edge Function ou serviço server-side, nunca por uma chave secreta no navegador.
 
 ## Supabase e configuração local
 
 Os dois apps usam o mesmo `VITE_SUPABASE_URL` e a chave pública `VITE_SUPABASE_ANON_KEY` (ou publishable key). Cada app terá seu próprio `.env.local`, ignorado pelo Git, com esses valores. A chave pública só é segura com grants mínimos e RLS corretamente configurado para todas as tabelas expostas. Nunca inclua `service_role`, secret keys, senhas ou connection strings privilegiadas nos apps ou no Git.
 
-Os dois diretórios já estão cadastrados como npm workspaces, com manifests mínimos para vendas e portal. Ainda falta inicializar cada workspace como app Vite e adicionar scripts de desenvolvimento/build quando a equipe começar essa implementação.
+Os dois apps são projetos Vite. Para rodar: `npm run dev -w @wethebest/vendas` (porta 5173) ou `npm run dev -w @wethebest/portal` (porta 5174).
 
 ## Publicação
 
