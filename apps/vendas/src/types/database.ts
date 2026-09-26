@@ -122,6 +122,36 @@ export type Database = {
           },
         ]
       }
+      intervalos_retirada: {
+        Row: {
+          ativo: boolean
+          atualizado_em: string
+          criado_em: string
+          fim: string
+          id: string
+          inicio: string
+          nome: string
+        }
+        Insert: {
+          ativo?: boolean
+          atualizado_em?: string
+          criado_em?: string
+          fim: string
+          id?: string
+          inicio: string
+          nome: string
+        }
+        Update: {
+          ativo?: boolean
+          atualizado_em?: string
+          criado_em?: string
+          fim?: string
+          id?: string
+          inicio?: string
+          nome?: string
+        }
+        Relationships: []
+      }
       movimentos_financeiros: {
         Row: {
           aluno_id: string
@@ -129,6 +159,7 @@ export type Database = {
           criado_por: string | null
           descricao: string | null
           id: string
+          pagamento_id: string | null
           tipo: Database["public"]["Enums"]["tipo_movimento"]
           valor_centavos: number
           venda_id: string | null
@@ -139,6 +170,7 @@ export type Database = {
           criado_por?: string | null
           descricao?: string | null
           id?: string
+          pagamento_id?: string | null
           tipo: Database["public"]["Enums"]["tipo_movimento"]
           valor_centavos: number
           venda_id?: string | null
@@ -149,6 +181,7 @@ export type Database = {
           criado_por?: string | null
           descricao?: string | null
           id?: string
+          pagamento_id?: string | null
           tipo?: Database["public"]["Enums"]["tipo_movimento"]
           valor_centavos?: number
           venda_id?: string | null
@@ -169,9 +202,211 @@ export type Database = {
             referencedColumns: ["aluno_id"]
           },
           {
+            foreignKeyName: "movimentos_financeiros_pagamento_id_fkey"
+            columns: ["pagamento_id"]
+            isOneToOne: false
+            referencedRelation: "pagamentos"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "movimentos_financeiros_venda_id_fkey"
             columns: ["venda_id"]
             isOneToOne: false
+            referencedRelation: "vendas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pagamentos: {
+        Row: {
+          aluno_id: string
+          confirmado_por: string | null
+          criado_em: string
+          expira_em: string
+          id: string
+          pago_em: string | null
+          pedido_id: string | null
+          provedor_id: string | null
+          solicitado_por: string | null
+          status: Database["public"]["Enums"]["status_pagamento"]
+          tipo: Database["public"]["Enums"]["tipo_pagamento"]
+          valor_centavos: number
+        }
+        Insert: {
+          aluno_id: string
+          confirmado_por?: string | null
+          criado_em?: string
+          expira_em: string
+          id?: string
+          pago_em?: string | null
+          pedido_id?: string | null
+          provedor_id?: string | null
+          solicitado_por?: string | null
+          status?: Database["public"]["Enums"]["status_pagamento"]
+          tipo: Database["public"]["Enums"]["tipo_pagamento"]
+          valor_centavos: number
+        }
+        Update: {
+          aluno_id?: string
+          confirmado_por?: string | null
+          criado_em?: string
+          expira_em?: string
+          id?: string
+          pago_em?: string | null
+          pedido_id?: string | null
+          provedor_id?: string | null
+          solicitado_por?: string | null
+          status?: Database["public"]["Enums"]["status_pagamento"]
+          tipo?: Database["public"]["Enums"]["tipo_pagamento"]
+          valor_centavos?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagamentos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pagamentos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "saldos_alunos"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "pagamentos_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: true
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pedido_itens: {
+        Row: {
+          id: string
+          nome_produto: string
+          pedido_id: string
+          preco_unitario_centavos: number
+          produto_id: string | null
+          quantidade: number
+          subtotal_centavos: number
+        }
+        Insert: {
+          id?: string
+          nome_produto: string
+          pedido_id: string
+          preco_unitario_centavos: number
+          produto_id?: string | null
+          quantidade: number
+          subtotal_centavos: number
+        }
+        Update: {
+          id?: string
+          nome_produto?: string
+          pedido_id?: string
+          preco_unitario_centavos?: number
+          produto_id?: string | null
+          quantidade?: number
+          subtotal_centavos?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedido_itens_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedido_itens_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pedidos: {
+        Row: {
+          aluno_id: string
+          corte_em: string
+          criado_em: string
+          criado_por: string | null
+          data_retirada: string
+          finalizado_em: string | null
+          forma_pagamento: Database["public"]["Enums"]["forma_pagamento_pedido"]
+          id: string
+          intervalo_id: string
+          motivo: string | null
+          observacao: string | null
+          pago_em: string | null
+          status: Database["public"]["Enums"]["status_pedido"]
+          total_centavos: number
+          venda_id: string | null
+        }
+        Insert: {
+          aluno_id: string
+          corte_em: string
+          criado_em?: string
+          criado_por?: string | null
+          data_retirada: string
+          finalizado_em?: string | null
+          forma_pagamento: Database["public"]["Enums"]["forma_pagamento_pedido"]
+          id?: string
+          intervalo_id: string
+          motivo?: string | null
+          observacao?: string | null
+          pago_em?: string | null
+          status?: Database["public"]["Enums"]["status_pedido"]
+          total_centavos: number
+          venda_id?: string | null
+        }
+        Update: {
+          aluno_id?: string
+          corte_em?: string
+          criado_em?: string
+          criado_por?: string | null
+          data_retirada?: string
+          finalizado_em?: string | null
+          forma_pagamento?: Database["public"]["Enums"]["forma_pagamento_pedido"]
+          id?: string
+          intervalo_id?: string
+          motivo?: string | null
+          observacao?: string | null
+          pago_em?: string | null
+          status?: Database["public"]["Enums"]["status_pedido"]
+          total_centavos?: number
+          venda_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "alunos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_aluno_id_fkey"
+            columns: ["aluno_id"]
+            isOneToOne: false
+            referencedRelation: "saldos_alunos"
+            referencedColumns: ["aluno_id"]
+          },
+          {
+            foreignKeyName: "pedidos_intervalo_id_fkey"
+            columns: ["intervalo_id"]
+            isOneToOne: false
+            referencedRelation: "intervalos_retirada"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pedidos_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: true
             referencedRelation: "vendas"
             referencedColumns: ["id"]
           },
@@ -211,6 +446,7 @@ export type Database = {
           criado_em: string
           criado_por: string | null
           descricao: string | null
+          foto_path: string | null
           id: string
           nome: string
           preco_centavos: number
@@ -221,6 +457,7 @@ export type Database = {
           criado_em?: string
           criado_por?: string | null
           descricao?: string | null
+          foto_path?: string | null
           id?: string
           nome: string
           preco_centavos: number
@@ -231,6 +468,7 @@ export type Database = {
           criado_em?: string
           criado_por?: string | null
           descricao?: string | null
+          foto_path?: string | null
           id?: string
           nome?: string
           preco_centavos?: number
@@ -331,6 +569,7 @@ export type Database = {
           motivo_cancelamento: string | null
           observacao: string | null
           operador_id: string | null
+          origem: string
           status: Database["public"]["Enums"]["status_venda"]
           total_centavos: number
         }
@@ -343,6 +582,7 @@ export type Database = {
           motivo_cancelamento?: string | null
           observacao?: string | null
           operador_id?: string | null
+          origem?: string
           status?: Database["public"]["Enums"]["status_venda"]
           total_centavos: number
         }
@@ -355,6 +595,7 @@ export type Database = {
           motivo_cancelamento?: string | null
           observacao?: string | null
           operador_id?: string | null
+          origem?: string
           status?: Database["public"]["Enums"]["status_venda"]
           total_centavos?: number
         }
@@ -429,6 +670,7 @@ export type Database = {
         }
         Returns: Json
       }
+      antecedencia_pedido: { Args: never; Returns: string }
       aprovar_conta_aluno: { Args: { p_aluno_id: string }; Returns: Json }
       aprovar_vinculo_responsavel: {
         Args: { p_aluno_id: string; p_responsavel_id: string }
@@ -442,6 +684,17 @@ export type Database = {
         Args: { p_motivo?: string; p_venda_id: string }
         Returns: Json
       }
+      confirmar_pagamento: { Args: { p_pagamento_id: string }; Returns: Json }
+      criar_pedido: {
+        Args: {
+          p_data_retirada: string
+          p_forma?: Database["public"]["Enums"]["forma_pagamento_pedido"]
+          p_intervalo_id: string
+          p_itens: Json
+          p_observacao?: string
+        }
+        Returns: Json
+      }
       definir_limite_mensal: {
         Args: { p_aluno_id: string; p_limite_centavos: number }
         Returns: Json
@@ -449,6 +702,22 @@ export type Database = {
       e_equipe: { Args: never; Returns: boolean }
       e_responsavel_de: { Args: { p_aluno_id: string }; Returns: boolean }
       e_titular_do_aluno: { Args: { p_aluno_id: string }; Returns: boolean }
+      efetivar_venda: {
+        Args: {
+          p_aluno_id: string
+          p_exigir_saldo: boolean
+          p_itens: Json
+          p_observacao: string
+          p_operador: string
+          p_origem: string
+        }
+        Returns: Json
+      }
+      expirar_pendentes: { Args: never; Returns: undefined }
+      finalizar_pedido: {
+        Args: { p_entregue: boolean; p_pedido_id: string }
+        Returns: Json
+      }
       papel_atual: {
         Args: never
         Returns: Database["public"]["Enums"]["papel_usuario"]
@@ -471,16 +740,32 @@ export type Database = {
         Args: { p_aluno_id: string; p_responsavel_id: string }
         Returns: Json
       }
+      solicitar_credito: {
+        Args: { p_aluno_id: string; p_valor_centavos: number }
+        Returns: Json
+      }
+      validade_pix: { Args: never; Returns: string }
       vincular_conta_aluno: {
         Args: { p_email_responsavel: string }
         Returns: Json
       }
     }
     Enums: {
+      forma_pagamento_pedido: "saldo" | "pix"
       papel_usuario: "equipe" | "responsavel" | "aluno"
+      status_pagamento: "pendente" | "pago" | "expirado"
+      status_pedido:
+        | "aguardando_pagamento"
+        | "pago"
+        | "entregue"
+        | "nao_retirado"
+        | "expirado"
+        | "recusado"
+        | "cancelado"
       status_venda: "confirmada" | "cancelada"
       status_vinculo: "pendente" | "ativo" | "revogado"
       tipo_movimento: "credito" | "compra" | "pagamento" | "ajuste" | "estorno"
+      tipo_pagamento: "credito" | "pedido"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -611,10 +896,22 @@ export const Constants = {
   },
   public: {
     Enums: {
+      forma_pagamento_pedido: ["saldo", "pix"],
       papel_usuario: ["equipe", "responsavel", "aluno"],
+      status_pagamento: ["pendente", "pago", "expirado"],
+      status_pedido: [
+        "aguardando_pagamento",
+        "pago",
+        "entregue",
+        "nao_retirado",
+        "expirado",
+        "recusado",
+        "cancelado",
+      ],
       status_venda: ["confirmada", "cancelada"],
       status_vinculo: ["pendente", "ativo", "revogado"],
       tipo_movimento: ["credito", "compra", "pagamento", "ajuste", "estorno"],
+      tipo_pagamento: ["credito", "pedido"],
     },
   },
 } as const

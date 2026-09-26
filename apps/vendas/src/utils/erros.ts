@@ -10,6 +10,11 @@ const MENSAGENS: Record<string, string> = {
   venda_invalida: 'Venda inválida ou já cancelada.',
   prazo_cancelamento_expirado: 'Esta venda tem mais de 24 horas e não pode mais ser cancelada.',
   valor_invalido: 'Valor inválido.',
+  saldo_insuficiente: 'Saldo insuficiente. Compre créditos ou pague o pedido com Pix.',
+  pedido_fora_do_prazo: 'Os pedidos para este horário já fecharam. Pedidos só valem para hoje ou amanhã.',
+  intervalo_invalido: 'Horário de retirada indisponível.',
+  pagamento_invalido: 'Pagamento não encontrado.',
+  pedido_invalido: 'Este pedido não está aguardando retirada.',
 }
 
 // Erros do Postgres em escritas diretas nas tabelas (produtos, estoque).
