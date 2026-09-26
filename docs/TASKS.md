@@ -5,12 +5,15 @@ Dividam o trabalho por funcionalidade e indiquem quem está atuando em cada tare
 ## Estrutura do monorepo
 
 - [x] Mover o scaffold de frontend para `apps/vendas`, criar o scaffold de `apps/portal` e configurar npm workspaces.
-- [ ] Inicializar cada workspace como app React + TypeScript + Vite e adicionar scripts de desenvolvimento/build.
+- [x] Inicializar `apps/vendas` como app React + TypeScript + Vite.
+- [ ] Inicializar `apps/portal` como app React + TypeScript + Vite.
 - [ ] Criar `packages/shared` somente se surgir código realmente compartilhado.
 
 ## Aplicativo de vendas — responsável: a definir
 
-- [ ] Implementar lançamento de vendas e consulta das vendas do mês para Carla.
+- [x] Camada de dados do app de vendas (`apps/vendas/src/services`): login, busca de aluno, venda com ou sem cliente registrado, cancelamento em 24 h, produtos, estoque e cadastro de aluno.
+- [ ] Telas de venda, cancelamento e cadastros para Carla.
+- [ ] Definir e implementar a consulta das vendas do mês (depende das telas).
 - [ ] Configurar o PWA instalável e documentar que a v1 exige conexão para acessar dados.
 
 ## Portal de pais e alunos — responsável: a definir

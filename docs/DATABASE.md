@@ -20,7 +20,7 @@ Primeira versão do esquema Supabase: identidade e papéis, catálogo com estoqu
 | `responsavel_aluno` | Vínculo N:N com `status` (`pendente`, `ativo`, `revogado`). |
 | `produtos` | Catálogo: nome, descrição, `preco_centavos`, `ativo`. |
 | `estoque` | Unidades disponíveis por produto, separado do catálogo. |
-| `vendas` | Aluno, operador, data/hora, `total_centavos`, `status` (`confirmada`, `cancelada`) e dados do cancelamento. |
+| `vendas` | Aluno (nulo para cliente não registrado), operador, data/hora, `total_centavos`, `status` (`confirmada`, `cancelada`) e dados do cancelamento. |
 | `venda_itens` | Snapshot de nome e preço unitário no momento da compra, quantidade e subtotal. |
 | `movimentos_financeiros` | Extrato append-only: `credito`, `compra`, `pagamento`, `estorno`, `ajuste`. |
 | `configuracoes` | Linha única de parâmetros globais (hoje só `vinculo_automatico`). |
@@ -30,7 +30,7 @@ Primeira versão do esquema Supabase: identidade e papéis, catálogo com estoqu
 | View | Para quê |
 | --- | --- |
 | `saldos_alunos` | Saldo atual por aluno (soma do extrato). Negativo = dívida. |
-| `gastos_mensais_alunos` | Gasto por aluno e competência mensal; só vendas confirmadas. |
+| `gastos_mensais_alunos` | Gasto por aluno e competência mensal; só vendas confirmadas com aluno. |
 | `vendas_mensais` | Fechamento mensal da Carla. |
 
 As três usam `security_invoker = on`: a RLS das tabelas de origem continua valendo dentro delas.
@@ -60,8 +60,8 @@ Todas são `SECURITY DEFINER` com `search_path = ''`, validam `auth.uid()` e o p
 
 | Função | Quem chama | O que faz |
 | --- | --- | --- |
-| `registrar_venda(aluno, itens jsonb, observacao)` | equipe | Valida, baixa estoque, recalcula preços pelo catálogo, checa limites, grava venda + itens + movimento. Atômica. |
-| `cancelar_venda(venda, motivo)` | equipe | Cancela, devolve ao estoque e lança o estorno. |
+| `registrar_venda(aluno, itens jsonb, observacao)` | equipe | Valida, baixa estoque, recalcula preços pelo catálogo, checa limites, grava venda + itens + movimento. Atômica. Com `aluno` nulo registra venda para cliente não registrado. |
+| `cancelar_venda(venda, motivo)` | equipe | Até 24 horas após a venda: cancela, devolve ao estoque e lança o estorno (venda avulsa não tem estorno). |
 | `registrar_pagamento(aluno, valor, descricao)` | equipe | Quitação de dívida paga no balcão. |
 | `adicionar_credito(aluno, valor, descricao)` | responsável ativo | Crédito (+) no extrato. |
 | `definir_limite_mensal(aluno, limite)` | responsável ativo | Teto mensal; `null` remove o limite. |
@@ -73,7 +73,7 @@ Todas são `SECURITY DEFINER` com `search_path = ''`, validam `auth.uid()` e o p
 
 Os predicados `papel_atual()`, `e_equipe()`, `e_responsavel_de(aluno)` e `e_titular_do_aluno(aluno)` também são `SECURITY DEFINER`: são chamados de dentro das próprias políticas RLS, onde uma consulta comum causaria recursão (em `perfis`) ou seria bloqueada (nas tabelas de vínculo). Eles nunca aceitam o sujeito como parâmetro — sempre resolvem por `auth.uid()`, então ninguém consegue perguntar "o usuário X é responsável pelo aluno Y?".
 
-Erros de negócio trazem um `detail` estável para o frontend tratar sem depender do texto: `papel_insuficiente`, `aluno_invalido`, `itens_invalidos`, `produto_indisponivel`, `estoque_insuficiente`, `limite_mensal_excedido`, `limite_divida_excedido`, `venda_invalida`, `valor_invalido`.
+Erros de negócio trazem um `detail` estável para o frontend tratar sem depender do texto: `papel_insuficiente`, `aluno_invalido`, `itens_invalidos`, `produto_indisponivel`, `estoque_insuficiente`, `limite_mensal_excedido`, `limite_divida_excedido`, `venda_invalida`, `prazo_cancelamento_expirado`, `valor_invalido`.
 
 ### Exemplo de chamada
 
@@ -93,6 +93,8 @@ O preço **não** é enviado pelo cliente: a função busca o valor vigente no c
 - **Piso de dívida: −R$ 250,00** (`piso_saldo_centavos()`). Venda que ultrapasse é recusada.
 - **Limite mensal** é regra independente: soma das vendas confirmadas do mês-calendário, tenham elas usado saldo positivo ou gerado dívida. `NULL` = sem limite.
 - Venda cancelada sai do gasto do mês e o estorno volta ao saldo.
+- **Cliente não registrado:** venda com `aluno_id` nulo, paga na hora. Baixa estoque e entra em `vendas_mensais`, mas não gera movimento no extrato nem passa por limite mensal ou piso de dívida. Só a equipe a enxerga.
+- **Prazo de cancelamento: 24 horas** a partir da venda (`prazo_cancelamento()`). Depois disso a função recusa com `prazo_cancelamento_expirado`.
 
 ## Como aplicar as migrações
 
