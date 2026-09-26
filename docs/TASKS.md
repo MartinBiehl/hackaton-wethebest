@@ -1,40 +1,56 @@
 # Tarefas
 
-Dividam o trabalho por funcionalidade e indiquem quem está atuando em cada tarefa. Evitem editar os mesmos arquivos ao mesmo tempo. Responsáveis ainda não definidos; combinar com a equipe antes de implementar.
+Estado consolidado em 2026-09-26. Dividam o trabalho por funcionalidade, indiquem quem está atuando em cada tarefa e evitem editar os mesmos arquivos ao mesmo tempo.
 
-## Estrutura do monorepo
+## Estrutura e documentação
 
-- [x] Mover o scaffold de frontend para `apps/vendas`, criar o scaffold de `apps/portal` e configurar npm workspaces.
-- [x] Inicializar `apps/vendas` como app React + TypeScript + Vite.
-- [x] Inicializar `apps/portal` como app React + TypeScript + Vite (porta 5174).
-- [x] Criar `packages/shared` com tipos do banco, erros, dinheiro e datas.
+- [x] Organizar `apps/vendas` e `apps/portal` como workspaces npm independentes.
+- [x] Inicializar os dois apps com React + TypeScript + Vite.
+- [x] Criar `packages/shared` com tipos do banco e utilitários de erros, dinheiro e datas.
+- [x] Versionar migrações, testes e configuração do Supabase em `supabase/`.
+- [x] Atualizar os documentos para refletir a estrutura implementada e registrar os Figma de [Desktop](https://www.figma.com/design/pv3RvxrhVU6F5TDJcmJq8B/Desktop?node-id=0-1&t=fUDQbVLkXjNGg9xc-1) e [Mobile iCarla](https://www.figma.com/design/TRpC2zJyvla20VRpTKnNKx/Mobile-Icarla?node-id=0-1&t=UoVuBK5LBWQocEJV-1).
+- [x] Registrar em [AI_USAGE.md](AI_USAGE.md) as partes produzidas integralmente por IA.
 
-## Aplicativo de vendas — branch `frontend-Cantina`
+## Aplicativo iCarla — vendas
 
-- [x] Camada de dados do app de vendas (`apps/vendas/src/services`): login, busca de aluno, venda com ou sem cliente registrado, cancelamento em 24 h, produtos, estoque e cadastro de aluno.
-- [x] Serviços de cardápio com foto, intervalos de retirada, fila de pedidos e confirmação de pagamentos.
-- [x] Telas de venda, cancelamento, cadastros (produtos com foto, estoque, alunos, intervalos), fila de pedidos e pagamentos.
-- [x] Consulta das vendas do mês (lista com filtros, indicadores e ranking de produtos mais vendidos) e fechamento mensal como relatório imprimível.
-- [ ] Testar as telas com a conta da Carla e dados reais.
-- [ ] Configurar o PWA instalável e documentar que a v1 exige conexão para acessar dados.
+- [x] Implementar autenticação e controle de sessão para a equipe.
+- [x] Implementar a camada de dados de alunos, produtos, estoque, vendas e cancelamento em até 24 horas.
+- [x] Implementar os serviços de intervalos, pedidos e confirmação de pagamentos.
+- [x] Implementar as telas de vendas, nova venda, fechamento mensal, pedidos, pagamentos, produtos, alunos e intervalos.
+- [x] Adicionar filtros, indicadores e ranking de produtos às vendas do mês.
+- [x] Adaptar as telas de desktop do Figma para os componentes React e para as regras reais do banco.
+- [x] Configurar o rewrite de SPA para a Vercel.
+- [ ] Testar todas as telas com a conta da Carla e dados reais.
+- [ ] Configurar manifest, ícones e service worker do PWA; documentar e validar o funcionamento online da v1.
 
-## Portal de pais e alunos — responsável: a definir
+## Portal de pais e alunos
 
-- [x] Serviços do portal: cadastro e login, vínculos, saldo, extrato, compras, limite, cardápio, créditos e pedidos prévios.
-- [ ] Telas do portal (cardápio, pedido, créditos, extrato, limite, vínculos).
-- [ ] Integrar a API de Pix por Edge Function (depois das telas) e restringir a confirmação manual.
+- [x] Implementar serviços de cadastro, login e sessão.
+- [x] Implementar serviços de alunos, vínculos, saldo, extrato, compras e limite mensal.
+- [x] Implementar serviços de cardápio, créditos e pedidos prévios.
+- [x] Substituir o scaffold do Vite pelas telas do portal.
+- [x] Implementar navegação e estados autenticados para responsável e aluno.
+- [x] Implementar cardápio, carrinho, agendamento, histórico de pedidos, créditos, extrato e limites.
+- [x] Configurar o rewrite de SPA para a Vercel.
+- [ ] Integrar e validar os fluxos do portal com as políticas RLS.
 
-## Supabase e publicação — responsável: a definir
+## Supabase e pagamentos
 
-- [x] Definir esquema PostgreSQL, migrações, perfis/vínculos e políticas RLS para cada papel. Aplicado no projeto remoto; ver [DATABASE.md](DATABASE.md).
-- [x] Validar grants e RLS para impedir que uma conta acesse registros não autorizados. Bateria em `supabase/tests/rls_smoke.sql`, executada em 2026-09-26.
-- [ ] Criar a conta da Carla no painel e promovê-la a `equipe` com o SQL de [DATABASE.md](DATABASE.md).
-- [ ] Decidir se o vínculo automático de contas de aluno será ligado (exige "Confirm email" no Auth).
-- [ ] Configurar os dois projetos Vercel Pro e seus domínios/variáveis de ambiente.
-- [ ] Usar Edge Functions para ações privilegiadas, caso sejam necessárias; manter chaves secretas fora do cliente e do Git.
+- [x] Definir e aplicar o esquema PostgreSQL, os perfis, os vínculos e as políticas RLS.
+- [x] Implementar catálogo com foto, estoque, vendas, extrato, créditos pagos e pedidos prévios.
+- [x] Implementar RPCs atômicas para as operações com regra de negócio.
+- [x] Validar grants, RLS, limites, estoque e escalada de privilégio em `supabase/tests/rls_smoke.sql`.
+- [x] Gerar e centralizar os tipos do banco em `packages/shared/src/database.ts`.
+- [ ] Criar a conta da Carla e promovê-la a `equipe` com o procedimento de [DATABASE.md](DATABASE.md).
+- [ ] Decidir se o vínculo automático de contas de aluno será ligado; isso exige confirmação de e-mail no Auth.
+- [ ] Escolher o provedor Pix e implementar cobrança e webhook por Edge Function.
+- [ ] Restringir a confirmação manual de pagamento depois da integração do Pix.
 
-## Integração e entrega — responsável: a definir
+## Integração e entrega
 
-- [ ] Conferir fluxo completo de venda e consulta mensal da Carla.
+- [ ] Conferir o fluxo completo de venda, cancelamento e fechamento mensal da Carla.
+- [ ] Conferir pedido, pagamento, retirada e tratamento de expiração.
 - [ ] Conferir login de pais/alunos e isolamento dos dados entre contas.
-- [ ] Atualizar esta lista com responsáveis, estado das tarefas e decisões ainda pendentes.
+- [ ] Executar `build` e `lint` dos dois workspaces antes da entrega.
+- [ ] Configurar os projetos Vercel, variáveis de ambiente e domínios dos dois apps.
+- [ ] Registrar responsáveis e atualizar esta lista conforme as tarefas forem concluídas.

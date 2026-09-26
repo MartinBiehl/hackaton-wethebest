@@ -1,43 +1,149 @@
 # Arquitetura
 
-## Arquitetura escolhida
+## Visão geral
 
-Um monorepo npm com dois aplicativos independentes em React + TypeScript + Vite:
+O projeto é um monorepo npm com dois aplicativos React + TypeScript + Vite, um pacote TypeScript compartilhado e a infraestrutura do Supabase versionada no mesmo repositório.
 
-- `apps/vendas`: sistema interno de Carla para lançar vendas e consultar o mês.
-- `apps/portal`: portal web de pais e alunos, com login e páginas de informações autorizadas.
-- `packages/shared`: código comum aos dois apps (tipos do banco, erros, dinheiro e datas), consumido direto do código-fonte.
-- `supabase/`: migrações SQL, seeds e Edge Functions opcionais.
+```text
+apps/vendas ──┐
+              ├── packages/shared ── tipos e utilitários comuns
+apps/portal ──┘
+       │
+       └──────── Supabase ── Auth, PostgreSQL, RLS, RPCs e Storage
+```
 
-Os diretórios `apps/vendas` e `apps/portal` e os npm workspaces já existem. O scaffold anterior de `frontend/` foi movido para `apps/vendas`; `apps/portal` recebeu a mesma estrutura-base. Os manifests são mínimos: ainda faltam inicializar os apps Vite, adicionar código, dependências e scripts de execução.
+Não existe um backend HTTP separado. Operações com regra de negócio são executadas em funções PostgreSQL atômicas. Uma Supabase Edge Function deve ser introduzida quando uma integração exigir segredo ou execução privilegiada, como na futura integração com o provedor de Pix.
 
-## Fluxo de dados e acesso
+## Estrutura do monorepo
 
-Os dois frontends conectam-se ao mesmo projeto Supabase usando `@supabase/supabase-js`, URL do projeto e chave pública. O Supabase fornece Auth e PostgreSQL. As políticas de grants e Row Level Security (RLS) no banco limitam cada operação e cada linha acessível; ocultar conteúdo na interface não é controle de segurança.
+```text
+apps/
+├── vendas/                    Aplicação interna iCarla
+│   ├── public/
+│   ├── src/
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   ├── pages/
+│   │   ├── services/
+│   │   └── utils/
+│   ├── vercel.json            Rewrite da SPA
+│   └── vite.config.ts         Servidor local na porta 5173
+└── portal/                    Portal de pais e alunos
+    ├── public/
+    ├── src/
+    │   ├── components/
+    │   ├── hooks/
+    │   ├── pages/
+    │   │   ├── aluno/
+    │   │   └── responsavel/
+    │   ├── services/
+    │   ├── styles/
+    │   └── utils/
+    ├── vercel.json            Rewrite da SPA
+    └── vite.config.ts         Servidor local na porta 5174
+packages/
+└── shared/src/
+    ├── database.ts            Tipos gerados a partir do Supabase
+    ├── datas.ts
+    ├── dinheiro.ts
+    ├── erros.ts
+    └── index.ts
+supabase/
+├── migrations/                Alterações SQL ordenadas e versionadas
+├── functions/                 Edge Functions futuras
+├── tests/rls_smoke.sql        Testes de isolamento e regras de negócio
+├── config.toml
+└── seed.sql
+```
 
-- A conta de Carla recebe permissões internas para lançar vendas e consultar os dados administrativos previstos.
-- Pais e alunos entram no portal e só acessam os registros autorizados para sua conta e vínculo.
-- Cada tabela exposta deve ter grants mínimos e políticas RLS explícitas. A chave `service_role` e quaisquer secret keys ficam somente em ambientes server-side protegidos.
-- Se uma ação exigir segredo ou privilégio indisponível no navegador, implementá-la em Supabase Edge Functions. Um backend separado só será introduzido se surgir requisito que Supabase não atenda adequadamente.
+Os workspaces são `@wethebest/vendas`, `@wethebest/portal` e `@wethebest/shared`. O pacote compartilhado exporta diretamente o código-fonte TypeScript; cada Vite o compila junto com o respectivo app, sem etapa própria de build.
 
-O modelo exato de perfis, vínculos entre responsáveis e alunos, tabelas, campos e políticas deve ser definido antes das migrações de produção; esta decisão arquitetural não presume esse esquema.
+## Aplicativo de vendas
 
-## Instalação e publicação
+`apps/vendas` é a interface operacional da Carla. O `App.tsx` usa `react-router-dom` e protege as rotas com o perfil obtido pelo hook de sessão.
 
-O app de vendas será um PWA instalável pelo navegador, implementado com manifest e service worker. A v1 exige internet para autenticar e ler/gravar dados no Supabase; gravação offline e sincronização posterior estão fora do escopo definido.
+Rotas implementadas:
 
-O portal e o PWA serão projetos Vercel Pro distintos, construídos a partir do mesmo repositório e com configuração própria de diretório, build e variáveis de ambiente. O portal terá domínio próprio. Os domínios finais ainda não foram escolhidos. Os dois deployments apontam para o mesmo projeto Supabase, com ambiente/credenciais configurados sem commitar arquivos locais.
+| Rota | Página | Responsabilidade |
+| --- | --- | --- |
+| `/vendas` | `Vendas` | Lista, filtros, indicadores, ranking e cancelamento. |
+| `/nova-venda` | `NovaVenda` | Venda para aluno ou cliente não registrado. |
+| `/fechamento` | `FechamentoMensal` | Relatório mensal calculado e imprimível. |
+| `/pedidos` | `Pedidos` | Fila de retirada e finalização. |
+| `/pagamentos` | `Pagamentos` | Confirmação manual de cobranças Pix pendentes. |
+| `/produtos` | `Produtos` | Catálogo, fotos, ativação e estoque. |
+| `/alunos` | `Alunos` | Cadastro, consulta de saldo e recebimento de fiado. |
+| `/intervalos` | `Intervalos` | Horários disponíveis para retirada. |
 
-Referências técnicas: [Vite na Vercel](https://vercel.com/docs/frameworks/frontend/vite), [domínios na Vercel](https://vercel.com/docs/domains/working-with-domains/add-a-domain), [segurança de dados no Supabase](https://supabase.com/docs/guides/database/secure-data), [RLS no Supabase](https://supabase.com/docs/guides/database/postgres/row-level-security).
+Os componentes reutilizáveis ficam em `components/`; sessão e comportamento assíncrono ficam em `hooks/`; o acesso ao Supabase fica isolado em `services/`. A interface não replica as regras críticas: preços, estoque, limites, saldo, cancelamento e pagamento são validados novamente no banco.
 
-## Segurança e configuração
+## Portal
 
-Cada app terá um `.env.local` próprio, ignorado pelo Git, com `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (ou publishable key). A chave pública pode ser exposta no frontend somente com grants mínimos e RLS ativa e validada. Nunca expor `service_role`, secret keys, senha de banco ou connection string privilegiada no cliente, em arquivo versionado ou em log.
+`apps/portal` usa `react-router-dom`, consome `@wethebest/shared` e separa a navegação autenticada conforme o papel retornado pela sessão.
 
-## Estado atual e próximos passos
+Principais rotas:
 
-Os dois apps já são projetos Vite com a camada de dados (`src/services`) implementada. O app de vendas tem as telas da Carla (login, vendas do mês, nova venda, fechamento mensal, fila de pedidos, pagamentos Pix e cadastros), com `react-router-dom` e rewrite de SPA em `apps/vendas/vercel.json`; as telas do portal estão em andamento. `packages/shared/` guarda o código comum; backend separado permanece fora do caminho inicial.
+| Rota | Público | Responsabilidade |
+| --- | --- | --- |
+| `/cadastro` | Não autenticado | Criação de conta de aluno ou responsável. |
+| `/aluno` | Aluno | Cardápio e entrada da área do aluno. |
+| `/aluno/pedido` | Aluno | Carrinho e resumo do pedido. |
+| `/aluno/retirada` | Aluno | Data, intervalo e forma de pagamento. |
+| `/aluno/pedidos` e `/aluno/pedidos/:pedidoId` | Aluno | Histórico e detalhe dos pedidos. |
+| `/aluno/creditos` | Aluno | Solicitação e acompanhamento de créditos. |
+| `/responsavel` | Responsável | Visão dos alunos vinculados. |
+| `/responsavel/alunos/:alunoId/extrato` | Responsável | Extrato e compras do aluno. |
+| `/responsavel/alunos/:alunoId/limites` | Responsável | Limite mensal e créditos. |
 
-O projeto Supabase está criado e vinculado à CLI (`supabase/config.toml`), e a primeira versão do banco já foi aplicada: perfis e papéis, vínculo N:N entre responsáveis e alunos, catálogo com estoque separado, vendas com snapshot de preço e extrato financeiro append-only, tudo com RLS e funções `SECURITY DEFINER` para as operações que exigem atomicidade. O modelo, a matriz de permissões e as pendências estão em [DATABASE.md](DATABASE.md).
+As telas compartilham layout, componentes de interface, tratamento de erros e um provedor de carrinho isolado por conta. A camada `src/services` está dividida por domínio:
 
-Próximos passos: inicializar Vite nos dois workspaces, conectar os apps ao Supabase, configurar os projetos Vercel e validar login e isolamento de dados por papel/conta na interface.
+- `auth.ts`: cadastro, login, logout e sessão;
+- `alunos.ts` e `vinculos.ts`: contas, responsáveis, limites e aprovações;
+- `cardapio.ts`: produtos disponíveis e intervalos;
+- `creditos.ts`: solicitações de crédito e pagamentos;
+- `extrato.ts`: movimentos e compras;
+- `pedidos.ts`: criação e histórico de pedidos.
+
+## Pacote compartilhado
+
+`packages/shared` surgiu depois que os dois apps passaram a dividir código real. Ele centraliza:
+
+- o tipo `Database` gerado pela CLI do Supabase;
+- conversão e formatação de valores em centavos;
+- datas e competência mensal no fuso `America/Sao_Paulo`;
+- tradução dos códigos de erro do banco para erros de negócio.
+
+Isso evita manter cópias divergentes da tipagem e das regras auxiliares nos dois frontends.
+
+## Supabase e fluxo de dados
+
+Os frontends usam `@supabase/supabase-js` com `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY`. O Supabase fornece:
+
+- Auth para as contas de equipe, responsáveis e alunos;
+- PostgreSQL para catálogo, estoque, vendas, extrato, créditos e pedidos;
+- RLS e grants mínimos para restringir linhas e operações por papel e vínculo;
+- RPCs `SECURITY DEFINER` para escritas atômicas e validações de negócio;
+- Storage público apenas para fotos de produtos, com escrita limitada à equipe.
+
+O fluxo de uma escrita crítica é:
+
+```text
+tela → service tipado → RPC do Supabase → validação de papel e regras
+     → transação no PostgreSQL → resposta ou erro de negócio estável
+```
+
+A matriz de permissões, as tabelas, as views e todas as RPCs estão detalhadas em [DATABASE.md](DATABASE.md).
+
+## Configuração, segurança e deploy
+
+Cada app usa seu próprio `.env.local`, ignorado pelo Git. Somente a URL do projeto e a chave pública anônima/publicável podem chegar ao frontend. `service_role`, secret keys, senhas e connection strings privilegiadas devem ficar fora do navegador, dos logs e do Git.
+
+Vendas e portal serão projetos Vercel independentes, cada um com diretório raiz, build e variáveis de ambiente próprios. Os dois apps já têm rewrite para rotas de SPA. Manifest, service worker e instalação como PWA ainda não foram configurados; a primeira versão continuará online.
+
+## Próximos passos arquiteturais
+
+1. Validar as telas dos dois apps com contas, vínculos e dados reais.
+2. Configurar e validar o PWA do app de vendas.
+3. Integrar o provedor de Pix por Edge Function e restringir a confirmação manual.
+4. Testar os fluxos de ponta a ponta e o isolamento entre contas.
+5. Configurar os dois projetos Vercel e seus domínios.
