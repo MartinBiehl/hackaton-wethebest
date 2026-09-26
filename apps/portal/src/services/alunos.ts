@@ -21,6 +21,7 @@ export async function listarAlunos(): Promise<AlunoPortal[]> {
   const { data: alunos, error } = await supabase
     .from('alunos')
     .select('id, nome, email_convite, user_id, user_id_pendente, limite_mensal_centavos')
+    .eq('ativo', true)
     .order('nome')
   if (error) throw erroDoSupabase(error)
   if (alunos.length === 0) return []

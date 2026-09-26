@@ -70,3 +70,34 @@ export async function listarPedidos(limite = 30): Promise<Pedido[]> {
     itens: pedido_itens,
   }))
 }
+
+export type PedidoDetalhado = Pedido & {
+  inicio_intervalo: string | null
+  // Cobrança Pix do pedido; nula quando foi pago com saldo.
+  pagamento: { valor_centavos: number; status: Database['public']['Enums']['status_pagamento']; expira_em: string } | null
+}
+
+// Um pedido com o horário do intervalo e a cobrança Pix. A RLS devolve nulo
+// para pedido de outra conta.
+export async function buscarPedido(id: string): Promise<PedidoDetalhado | null> {
+  await supabase.rpc('expirar_pendentes')
+
+  const { data, error } = await supabase
+    .from('pedidos')
+    .select(
+      'id, data_retirada, status, forma_pagamento, total_centavos, motivo, criado_em, intervalos_retirada(nome, inicio), pedido_itens(nome_produto, quantidade, subtotal_centavos), pagamentos(valor_centavos, status, expira_em)',
+    )
+    .eq('id', id)
+    .maybeSingle()
+  if (error) throw erroDoSupabase(error)
+  if (!data) return null
+
+  const { intervalos_retirada, pedido_itens, pagamentos, ...pedido } = data
+  return {
+    ...pedido,
+    intervalo: intervalos_retirada?.nome ?? null,
+    inicio_intervalo: intervalos_retirada?.inicio ?? null,
+    itens: pedido_itens,
+    pagamento: pagamentos ?? null,
+  }
+}
