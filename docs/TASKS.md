@@ -9,12 +9,13 @@ Dividam o trabalho por funcionalidade e indiquem quem está atuando em cada tare
 - [x] Inicializar `apps/portal` como app React + TypeScript + Vite (porta 5174).
 - [x] Criar `packages/shared` com tipos do banco, erros, dinheiro e datas.
 
-## Aplicativo de vendas — responsável: a definir
+## Aplicativo de vendas — branch `frontend-Cantina`
 
 - [x] Camada de dados do app de vendas (`apps/vendas/src/services`): login, busca de aluno, venda com ou sem cliente registrado, cancelamento em 24 h, produtos, estoque e cadastro de aluno.
 - [x] Serviços de cardápio com foto, intervalos de retirada, fila de pedidos e confirmação de pagamentos.
-- [ ] Telas de venda, cancelamento, cadastros (produtos com foto, estoque, alunos, intervalos), fila de pedidos e pagamentos.
-- [ ] Definir e implementar a consulta das vendas do mês (depende das telas).
+- [x] Telas de venda, cancelamento, cadastros (produtos com foto, estoque, alunos, intervalos), fila de pedidos e pagamentos.
+- [x] Consulta das vendas do mês (lista com filtros, indicadores e ranking de produtos mais vendidos) e fechamento mensal como relatório imprimível.
+- [ ] Testar as telas com a conta da Carla e dados reais.
 - [ ] Configurar o PWA instalável e documentar que a v1 exige conexão para acessar dados.
 
 ## Portal de pais e alunos — responsável: a definir
