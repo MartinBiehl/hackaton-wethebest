@@ -1,5 +1,9 @@
 import { supabase } from './supabase'
-import { erroDoSupabase } from '../utils/erros'
+import { ErroNegocio, erroDoSupabase } from '@wethebest/shared'
+
+const BUCKET_FOTOS = 'produtos'
+const TIPOS_FOTO: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
+const TAMANHO_MAXIMO_FOTO = 5 * 1024 * 1024
 
 export type Produto = {
   id: string
@@ -7,6 +11,7 @@ export type Produto = {
   descricao: string | null
   preco_centavos: number
   ativo: boolean
+  foto_path: string | null
   estoque: number
 }
 
@@ -21,7 +26,7 @@ export type DadosProduto = {
 export async function listarProdutos(incluirInativos = false): Promise<Produto[]> {
   let consulta = supabase
     .from('produtos')
-    .select('id, nome, descricao, preco_centavos, ativo, estoque(quantidade)')
+    .select('id, nome, descricao, preco_centavos, ativo, foto_path, estoque(quantidade)')
     .order('nome')
   if (!incluirInativos) consulta = consulta.eq('ativo', true)
 
@@ -48,4 +53,41 @@ export async function atualizarProduto(id: string, dados: Partial<DadosProduto>)
 export async function definirEstoque(produtoId: string, quantidade: number): Promise<void> {
   const { error } = await supabase.from('estoque').update({ quantidade }).eq('produto_id', produtoId)
   if (error) throw erroDoSupabase(error)
+}
+
+// Envia a foto (JPEG, PNG ou WebP, até 5 MB) e troca a do produto.
+// Cada envio gera um arquivo novo, então a URL muda e o navegador não mostra a foto antiga em cache.
+export async function enviarFoto(produtoId: string, arquivo: File): Promise<string> {
+  const extensao = TIPOS_FOTO[arquivo.type]
+  if (!extensao) throw new ErroNegocio('foto_invalida', 'Use uma foto JPEG, PNG ou WebP.')
+  if (arquivo.size > TAMANHO_MAXIMO_FOTO) throw new ErroNegocio('foto_invalida', 'A foto deve ter no máximo 5 MB.')
+
+  const { data: atual } = await supabase.from('produtos').select('foto_path').eq('id', produtoId).single()
+
+  const caminho = `${produtoId}/${crypto.randomUUID()}.${extensao}`
+  const { error: erroEnvio } = await supabase.storage
+    .from(BUCKET_FOTOS)
+    .upload(caminho, arquivo, { contentType: arquivo.type })
+  if (erroEnvio) throw new ErroNegocio('foto_invalida', 'Não foi possível enviar a foto.')
+
+  const { error } = await supabase.from('produtos').update({ foto_path: caminho }).eq('id', produtoId)
+  if (error) {
+    await supabase.storage.from(BUCKET_FOTOS).remove([caminho])
+    throw erroDoSupabase(error)
+  }
+
+  // A foto anterior deixa de ser usada; se a remoção falhar, só sobra um arquivo órfão.
+  if (atual?.foto_path) await supabase.storage.from(BUCKET_FOTOS).remove([atual.foto_path])
+  return caminho
+}
+
+export async function removerFoto(produtoId: string, fotoPath: string): Promise<void> {
+  const { error } = await supabase.from('produtos').update({ foto_path: null }).eq('id', produtoId)
+  if (error) throw erroDoSupabase(error)
+  await supabase.storage.from(BUCKET_FOTOS).remove([fotoPath])
+}
+
+export function urlFoto(fotoPath: string | null): string | null {
+  if (!fotoPath) return null
+  return supabase.storage.from(BUCKET_FOTOS).getPublicUrl(fotoPath).data.publicUrl
 }

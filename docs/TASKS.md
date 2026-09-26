@@ -6,20 +6,22 @@ Dividam o trabalho por funcionalidade e indiquem quem está atuando em cada tare
 
 - [x] Mover o scaffold de frontend para `apps/vendas`, criar o scaffold de `apps/portal` e configurar npm workspaces.
 - [x] Inicializar `apps/vendas` como app React + TypeScript + Vite.
-- [ ] Inicializar `apps/portal` como app React + TypeScript + Vite.
-- [ ] Criar `packages/shared` somente se surgir código realmente compartilhado.
+- [x] Inicializar `apps/portal` como app React + TypeScript + Vite (porta 5174).
+- [x] Criar `packages/shared` com tipos do banco, erros, dinheiro e datas.
 
 ## Aplicativo de vendas — responsável: a definir
 
 - [x] Camada de dados do app de vendas (`apps/vendas/src/services`): login, busca de aluno, venda com ou sem cliente registrado, cancelamento em 24 h, produtos, estoque e cadastro de aluno.
-- [ ] Telas de venda, cancelamento e cadastros para Carla.
+- [x] Serviços de cardápio com foto, intervalos de retirada, fila de pedidos e confirmação de pagamentos.
+- [ ] Telas de venda, cancelamento, cadastros (produtos com foto, estoque, alunos, intervalos), fila de pedidos e pagamentos.
 - [ ] Definir e implementar a consulta das vendas do mês (depende das telas).
 - [ ] Configurar o PWA instalável e documentar que a v1 exige conexão para acessar dados.
 
 ## Portal de pais e alunos — responsável: a definir
 
-- [ ] Definir conteúdo das páginas, fluxo de login e vínculo entre responsáveis e alunos.
-- [ ] Implementar acesso autenticado às informações autorizadas para cada conta.
+- [x] Serviços do portal: cadastro e login, vínculos, saldo, extrato, compras, limite, cardápio, créditos e pedidos prévios.
+- [ ] Telas do portal (cardápio, pedido, créditos, extrato, limite, vínculos).
+- [ ] Integrar a API de Pix por Edge Function (depois das telas) e restringir a confirmação manual.
 
 ## Supabase e publicação — responsável: a definir
 

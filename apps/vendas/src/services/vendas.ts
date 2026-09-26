@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { erroDoSupabase } from '../utils/erros'
+import { erroDoSupabase } from '@wethebest/shared'
 
 export type ItemVenda = { produto_id: string; quantidade: number }
 

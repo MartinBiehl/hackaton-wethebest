@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { erroDoSupabase } from '../utils/erros'
+import { erroDoSupabase } from '@wethebest/shared'
 
 export type AlunoResumo = { id: string; nome: string }
 

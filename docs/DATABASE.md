@@ -1,6 +1,6 @@
 # Banco de dados
 
-Primeira versão do esquema Supabase: identidade e papéis, catálogo com estoque, vendas e extrato financeiro. As migrações estão em `supabase/migrations/` e já foram aplicadas no projeto `kggurgtwhoofalzptizv`.
+Esquema Supabase: identidade e papéis, cardápio com foto e estoque, vendas, extrato financeiro, créditos pagos e pedidos prévios. As migrações estão em `supabase/migrations/` e já foram aplicadas no projeto `kggurgtwhoofalzptizv`.
 
 ## Princípios
 
@@ -18,11 +18,15 @@ Primeira versão do esquema Supabase: identidade e papéis, catálogo com estoqu
 | `perfis` | 1:1 com `auth.users`. Nome, e-mail e `papel` (`equipe`, `responsavel`, `aluno`). |
 | `alunos` | O aluno como **registro**, não como conta: pode existir antes de ter login. Guarda `email_convite`, `user_id` (conta confirmada), `user_id_pendente` (conta aguardando aprovação) e `limite_mensal_centavos`. |
 | `responsavel_aluno` | Vínculo N:N com `status` (`pendente`, `ativo`, `revogado`). |
-| `produtos` | Catálogo: nome, descrição, `preco_centavos`, `ativo`. |
+| `produtos` | Catálogo: nome, descrição, `preco_centavos`, `ativo` e `foto_path` (arquivo no bucket `produtos` do Storage). |
 | `estoque` | Unidades disponíveis por produto, separado do catálogo. |
-| `vendas` | Aluno (nulo para cliente não registrado), operador, data/hora, `total_centavos`, `status` (`confirmada`, `cancelada`) e dados do cancelamento. |
+| `vendas` | Aluno (nulo para cliente não registrado), operador, data/hora, `total_centavos`, `status` (`confirmada`, `cancelada`), `origem` (`balcao`, `pedido`) e dados do cancelamento. |
 | `venda_itens` | Snapshot de nome e preço unitário no momento da compra, quantidade e subtotal. |
-| `movimentos_financeiros` | Extrato append-only: `credito`, `compra`, `pagamento`, `estorno`, `ajuste`. |
+| `movimentos_financeiros` | Extrato append-only: `credito`, `compra`, `pagamento`, `estorno`, `ajuste`. Crédito vindo de Pix guarda `pagamento_id` (no máximo um por pagamento). |
+| `intervalos_retirada` | Horários de retirada de pedidos prévios (nome, início, fim, `ativo`), cadastrados pela equipe. |
+| `pedidos` | Pedido prévio do aluno: intervalo, `data_retirada`, `status`, forma de pagamento (`saldo`, `pix`), total, `corte_em` e a `venda_id` gerada quando é pago. |
+| `pedido_itens` | Snapshot de nome e preço no momento do pedido. |
+| `pagamentos` | Cobranças Pix de crédito ou de pedido: `status` (`pendente`, `pago`, `expirado`), `expira_em`, quem confirmou e `provedor_id` (para a API de Pix). |
 | `configuracoes` | Linha única de parâmetros globais (hoje só `vinculo_automatico`). |
 
 ### Views
@@ -46,11 +50,15 @@ As três usam `security_invoker = on`: a RLS das tabelas de origem continua vale
 | `alunos` | — | SELECT de todos (precisa pesquisar na venda) | SELECT dos vinculados **ativos** | SELECT de si mesmo (inclusive quando pendente) |
 | `responsavel_aluno` | — | — | SELECT dos próprios vínculos | SELECT de quem o acompanha |
 | `produtos` | — | SELECT/INSERT/UPDATE | SELECT só dos ativos | SELECT só dos ativos |
-| `estoque` | — | SELECT/UPDATE | — | — |
+| `estoque` | — | SELECT/UPDATE | SELECT dos produtos ativos | SELECT dos produtos ativos |
 | `vendas` | — | SELECT de todas | SELECT dos alunos vinculados | SELECT das próprias |
 | `venda_itens` | — | SELECT de todos | SELECT dos alunos vinculados | SELECT dos próprios |
 | `movimentos_financeiros` | — | SELECT de todos | SELECT dos alunos vinculados | SELECT dos próprios |
 | `configuracoes` | — | SELECT | — | — |
+| `intervalos_retirada` | — | SELECT/INSERT/UPDATE | SELECT dos ativos | SELECT dos ativos |
+| `pedidos`, `pedido_itens` | — | SELECT de todos | SELECT dos alunos vinculados | SELECT dos próprios |
+| `pagamentos` | — | SELECT de todos | SELECT dos alunos vinculados | SELECT dos próprios |
+| Storage `produtos` | leitura pública pela URL | envia, troca e apaga fotos | — | — |
 
 Nenhum papel tem `UPDATE` ou `DELETE` em `movimentos_financeiros`: correção entra como novo movimento (`ajuste` ou `estorno`). `produtos` não tem `DELETE` para ninguém — use `ativo = false`, para não quebrar a referência do histórico.
 
@@ -60,10 +68,15 @@ Todas são `SECURITY DEFINER` com `search_path = ''`, validam `auth.uid()` e o p
 
 | Função | Quem chama | O que faz |
 | --- | --- | --- |
-| `registrar_venda(aluno, itens jsonb, observacao)` | equipe | Valida, baixa estoque, recalcula preços pelo catálogo, checa limites, grava venda + itens + movimento. Atômica. Com `aluno` nulo registra venda para cliente não registrado. |
-| `cancelar_venda(venda, motivo)` | equipe | Até 24 horas após a venda: cancela, devolve ao estoque e lança o estorno (venda avulsa não tem estorno). |
+| `registrar_venda(aluno, itens jsonb, observacao)` | equipe | Valida, baixa estoque, recalcula preços pelo catálogo, checa limites, grava venda + itens + movimento. Atômica. Com `aluno` nulo registra venda para cliente não registrado. O núcleo fica em `efetivar_venda`, função interna sem EXECUTE para clientes, usada também pelos pedidos. |
+| `cancelar_venda(venda, motivo)` | equipe | Até 24 horas após a venda: cancela, devolve ao estoque e lança o estorno (venda avulsa não tem estorno). Se a venda veio de pedido, o pedido fica `cancelado`. |
 | `registrar_pagamento(aluno, valor, descricao)` | equipe | Quitação de dívida paga no balcão. |
-| `adicionar_credito(aluno, valor, descricao)` | responsável ativo | Crédito (+) no extrato. |
+| `adicionar_credito(aluno, valor, descricao)` | ninguém (sem EXECUTE para clientes) | Mantida só para uso administrativo: crédito sem pagamento. |
+| `solicitar_credito(aluno, valor)` | responsável ativo ou aluno titular | Cria cobrança Pix `pendente` (expira em 30 min). O saldo só muda na confirmação. |
+| `criar_pedido(intervalo, data, itens, forma, observacao)` | aluno titular | Pedido prévio para hoje ou amanhã, até 30 min antes do intervalo. `saldo`: exige saldo suficiente e efetiva na hora. `pix`: cria pedido e cobrança pendentes. Sem reserva de estoque. |
+| `confirmar_pagamento(pagamento)` | equipe (provisório) | Idempotente. Marca como pago e lança o crédito; se for de pedido, efetiva a venda ou, sem estoque/limite/prazo, recusa ou expira o pedido e mantém o crédito. |
+| `finalizar_pedido(pedido, entregue)` | equipe | Pedido pago vira `entregue` ou `nao_retirado` (sem devolução). |
+| `expirar_pendentes()` | qualquer conta logada | Marca como expirados os Pix e pedidos vencidos. Chamada antes de listar. |
 | `definir_limite_mensal(aluno, limite)` | responsável ativo | Teto mensal; `null` remove o limite. |
 | `cadastrar_aluno(nome, email)` | responsável ou equipe | Pré-cadastro. Responsável cria com vínculo ativo; equipe cria sem vínculo. |
 | `vincular_conta_aluno(email_responsavel)` | aluno | Casa a conta com o pré-cadastro. |
@@ -73,7 +86,7 @@ Todas são `SECURITY DEFINER` com `search_path = ''`, validam `auth.uid()` e o p
 
 Os predicados `papel_atual()`, `e_equipe()`, `e_responsavel_de(aluno)` e `e_titular_do_aluno(aluno)` também são `SECURITY DEFINER`: são chamados de dentro das próprias políticas RLS, onde uma consulta comum causaria recursão (em `perfis`) ou seria bloqueada (nas tabelas de vínculo). Eles nunca aceitam o sujeito como parâmetro — sempre resolvem por `auth.uid()`, então ninguém consegue perguntar "o usuário X é responsável pelo aluno Y?".
 
-Erros de negócio trazem um `detail` estável para o frontend tratar sem depender do texto: `papel_insuficiente`, `aluno_invalido`, `itens_invalidos`, `produto_indisponivel`, `estoque_insuficiente`, `limite_mensal_excedido`, `limite_divida_excedido`, `venda_invalida`, `prazo_cancelamento_expirado`, `valor_invalido`.
+Erros de negócio trazem um `detail` estável para o frontend tratar sem depender do texto: `papel_insuficiente`, `aluno_invalido`, `itens_invalidos`, `produto_indisponivel`, `estoque_insuficiente`, `limite_mensal_excedido`, `limite_divida_excedido`, `venda_invalida`, `prazo_cancelamento_expirado`, `valor_invalido`, `saldo_insuficiente`, `pedido_fora_do_prazo`, `intervalo_invalido`, `pagamento_invalido`, `pedido_invalido`.
 
 ### Exemplo de chamada
 
@@ -95,6 +108,30 @@ O preço **não** é enviado pelo cliente: a função busca o valor vigente no c
 - Venda cancelada sai do gasto do mês e o estorno volta ao saldo.
 - **Cliente não registrado:** venda com `aluno_id` nulo, paga na hora. Baixa estoque e entra em `vendas_mensais`, mas não gera movimento no extrato nem passa por limite mensal ou piso de dívida. Só a equipe a enxerga.
 - **Prazo de cancelamento: 24 horas** a partir da venda (`prazo_cancelamento()`). Depois disso a função recusa com `prazo_cancelamento_expirado`.
+
+## Créditos e pedidos prévios
+
+- **Crédito só depois de pago.** Responsável ou aluno geram a cobrança (`solicitar_credito`); o valor entra no extrato quando o pagamento é confirmado. Um mesmo pagamento nunca credita duas vezes.
+- **Pedido prévio** é feito só pelo aluno, para hoje ou amanhã (fuso `America/Sao_Paulo`), em um intervalo ativo, até 30 minutos antes do início (`antecedencia_pedido()`).
+- **Sem reserva de estoque.** Ao pedir, o banco só confere as unidades do momento. O estoque baixa quando o pedido é pago: na hora, se for com saldo; na confirmação, se for com Pix.
+- **Pix pendente expira** em 30 minutos (`validade_pix()`) ou no fechamento do intervalo, o que vier antes.
+- **Pedido pago vira venda** (`origem = 'pedido'`): entra no fechamento mensal, no limite mensal e no extrato. Pago com Pix, gera `credito` (+) e `compra` (−), sem alterar o saldo líquido.
+- **Pix confirmado sem estoque, acima do limite ou depois do prazo:** o pedido fica `recusado` ou `expirado` e o valor permanece como crédito no saldo do aluno.
+- O aluno **não cancela** pedidos, e pedido **não retirado não é devolvido**. A equipe pode cancelar a venda do pedido em até 24 horas, com estorno.
+
+### Integração com Pix (próxima etapa)
+
+Hoje a Carla confirma os pagamentos no app de vendas. A API de Pix entrará por uma Edge Function que cria a cobrança (preenchendo `pagamentos.provedor_id`) e, no webhook, confirma o pagamento com a mesma lógica de `confirmar_pagamento`, usando `service_role` só no servidor. Nesse momento a confirmação manual deve ser restringida.
+
+## Tipos TypeScript
+
+Os tipos do banco ficam em `packages/shared/src/database.ts` e são usados pelos dois apps. Depois de aplicar uma migração, regenere:
+
+```bash
+npx supabase gen types typescript --linked > packages/shared/src/database.ts
+```
+
+No PowerShell o `>` pode gravar em UTF-16; rode pelo Git Bash.
 
 ## Como aplicar as migrações
 
@@ -125,7 +162,7 @@ update public.perfis set papel = 'equipe' where email = 'email-da-carla@exemplo.
 
 ## Verificação
 
-`supabase/tests/rls_smoke.sql` cobre papéis, isolamento entre contas, limites, piso de dívida, estoque concorrente, atomicidade e escalada de privilégio. Roda no SQL Editor e termina em `ROLLBACK` — não deixa dados. Deve imprimir `TODOS OS TESTES PASSARAM`.
+`supabase/tests/rls_smoke.sql` cobre papéis, isolamento entre contas, limites, piso de dívida, estoque concorrente, atomicidade, escalada de privilégio, venda avulsa, prazo de cancelamento, fotos do cardápio, créditos pagos e pedidos prévios. Roda no SQL Editor e termina em `ROLLBACK` — não deixa dados. Deve imprimir `TODOS OS TESTES PASSARAM`.
 
 Executado em 2026-09-26 contra o projeto: passou, e nenhum registro permaneceu.
 
@@ -134,4 +171,5 @@ Executado em 2026-09-26 contra o projeto: passou, e nenhum registro permaneceu.
 - **`configuracoes.vinculo_automatico` está `false`**, então toda conta de aluno espera aprovação do responsável. Para ativar o vínculo automático, primeiro ligue *Confirm email* em Authentication → Providers (com a confirmação desligada, o Auth marca todo e-mail como confirmado no cadastro e a verificação perde o sentido), depois rode `update public.configuracoes set vinculo_automatico = true where id = 1;`.
 - **Limite mensal por aluno, não por responsável.** Com vários responsáveis, o último a definir prevalece. Se isso incomodar, é decisão de produto.
 - **Vazamento residual aceito:** ao pré-cadastrar um e-mail que já pertence a outro aluno, o responsável recebe `aguardando_aprovacao` em vez de `criado`, e assim descobre que aquele e-mail já existe. Não há consulta pública de e-mails, e nenhum dado do aluno é revelado. Fechar isso completamente exigiria um fluxo de convite por e-mail.
-- **Encomendas não foram modeladas**: não há reserva de estoque. Uma venda só passa se houver unidades no instante do processamento.
+- **Confirmação manual de pagamento** vale só até a integração do Pix; a Carla deve confirmar apenas pagamentos que realmente recebeu.
+- **Expiração sem agendador:** pendências vencidas são marcadas quando alguém lista ou cria pedidos (`expirar_pendentes`). Se for preciso expirar em horário fixo, ligar `pg_cron`.
