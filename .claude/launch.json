@@ -5,7 +5,8 @@
       "name": "vendas",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "-w", "@wethebest/vendas"],
-      "port": 5173
+      "port": 5173,
+      "autoPort": true
     }
   ]
 }

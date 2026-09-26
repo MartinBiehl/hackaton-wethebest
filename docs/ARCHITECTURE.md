@@ -36,7 +36,7 @@ Cada app terá um `.env.local` próprio, ignorado pelo Git, com `VITE_SUPABASE_U
 
 ## Estado atual e próximos passos
 
-Os dois apps já são projetos Vite com a camada de dados (`src/services`) implementada; faltam as telas. `packages/shared/` guarda o código comum; backend separado permanece fora do caminho inicial.
+Os dois apps já são projetos Vite com a camada de dados (`src/services`) implementada. O app de vendas tem as telas da Carla (login, vendas do mês, nova venda, fechamento mensal, fila de pedidos, pagamentos Pix e cadastros), com `react-router-dom` e rewrite de SPA em `apps/vendas/vercel.json`; as telas do portal estão em andamento. `packages/shared/` guarda o código comum; backend separado permanece fora do caminho inicial.
 
 O projeto Supabase está criado e vinculado à CLI (`supabase/config.toml`), e a primeira versão do banco já foi aplicada: perfis e papéis, vínculo N:N entre responsáveis e alunos, catálogo com estoque separado, vendas com snapshot de preço e extrato financeiro append-only, tudo com RLS e funções `SECURITY DEFINER` para as operações que exigem atomicidade. O modelo, a matriz de permissões e as pendências estão em [DATABASE.md](DATABASE.md).
 

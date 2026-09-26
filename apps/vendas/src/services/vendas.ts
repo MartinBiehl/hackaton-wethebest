@@ -62,3 +62,112 @@ export async function listarVendasCancelaveis(): Promise<VendaCancelavel[]> {
     itens: venda_itens,
   }))
 }
+
+export type OrigemVenda = 'balcao' | 'pedido'
+
+export type VendaListada = {
+  id: string
+  criado_em: string
+  aluno_id: string | null
+  aluno: string | null
+  origem: OrigemVenda
+  status: 'confirmada' | 'cancelada'
+  total_centavos: number
+  quantidade_itens: number
+  itens: ItemVendido[]
+}
+
+// produto_id fica nulo só se o produto sumir do catálogo; o nome é o do momento da venda.
+export type ItemVendido = {
+  produto_id: string | null
+  nome_produto: string
+  quantidade: number
+  subtotal_centavos: number
+}
+
+export type FiltroVendas = {
+  inicio: string
+  fim: string
+  alunoId?: string
+  origem?: OrigemVenda
+  // 'avulsa' = cliente não registrado (pago na hora); 'conta' = debitada do saldo do aluno.
+  cliente?: 'avulsa' | 'conta'
+}
+
+// Vendas de um período (limites em ISO: início incluso, fim excluído), mais recentes primeiro.
+export async function listarVendas(filtro: FiltroVendas): Promise<VendaListada[]> {
+  let consulta = supabase
+    .from('vendas')
+    .select('id, criado_em, aluno_id, origem, status, total_centavos, alunos(nome), venda_itens(produto_id, nome_produto, quantidade, subtotal_centavos)')
+    .gte('criado_em', filtro.inicio)
+    .lt('criado_em', filtro.fim)
+    .order('criado_em', { ascending: false })
+  if (filtro.alunoId) consulta = consulta.eq('aluno_id', filtro.alunoId)
+  if (filtro.origem) consulta = consulta.eq('origem', filtro.origem)
+  if (filtro.cliente === 'avulsa') consulta = consulta.is('aluno_id', null)
+  if (filtro.cliente === 'conta') consulta = consulta.not('aluno_id', 'is', null)
+
+  const { data, error } = await consulta
+  if (error) throw erroDoSupabase(error)
+
+  return data.map(({ alunos, venda_itens, origem, ...venda }) => ({
+    ...venda,
+    origem: origem as OrigemVenda,
+    aluno: alunos?.nome ?? null,
+    quantidade_itens: venda_itens.reduce((soma, item) => soma + item.quantidade, 0),
+    itens: venda_itens,
+  }))
+}
+
+export type ResumoPeriodo = {
+  total_centavos: number
+  quantidade_vendas: number
+  avulsas_centavos: number
+  conta_centavos: number
+  pedidos_centavos: number
+  canceladas: number
+  creditos_pix_centavos: number
+  pagamentos_balcao_centavos: number
+}
+
+// Resumo do fechamento: só vendas confirmadas entram nos totais.
+// "Avulsas" foram pagas na hora; "conta" saiu do saldo do aluno.
+export async function resumoDoPeriodo(inicio: string, fim: string): Promise<ResumoPeriodo> {
+  const [vendas, movimentos] = await Promise.all([
+    listarVendas({ inicio, fim }),
+    supabase
+      .from('movimentos_financeiros')
+      .select('tipo, valor_centavos, pagamento_id')
+      .in('tipo', ['credito', 'pagamento'])
+      .gte('criado_em', inicio)
+      .lt('criado_em', fim),
+  ])
+  if (movimentos.error) throw erroDoSupabase(movimentos.error)
+
+  const resumo: ResumoPeriodo = {
+    total_centavos: 0,
+    quantidade_vendas: 0,
+    avulsas_centavos: 0,
+    conta_centavos: 0,
+    pedidos_centavos: 0,
+    canceladas: 0,
+    creditos_pix_centavos: 0,
+    pagamentos_balcao_centavos: 0,
+  }
+  for (const venda of vendas) {
+    if (venda.status === 'cancelada') {
+      resumo.canceladas++
+      continue
+    }
+    resumo.total_centavos += venda.total_centavos
+    resumo.quantidade_vendas++
+    if (venda.aluno_id === null) resumo.avulsas_centavos += venda.total_centavos
+    else resumo.conta_centavos += venda.total_centavos
+    if (venda.origem === 'pedido') resumo.pedidos_centavos += venda.total_centavos
+  }
+  for (const movimento of movimentos.data) {
+    if (movimento.tipo === 'credito' && movimento.pagamento_id) resumo.creditos_pix_centavos += movimento.valor_centavos
+    if (movimento.tipo === 'pagamento') resumo.pagamentos_balcao_centavos += movimento.valor_centavos
+  }
+  return resumo
+}
